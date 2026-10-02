@@ -48,7 +48,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; 
 
 /* ---------- HUD ---------- */
 #hud { position: relative; z-index: 5; display: flex; align-items: center; gap: 14px; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: linear-gradient(180deg, #0a0f14f2, #0a0f14c0); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-#hud[hidden] { display: none !important; }
+/* hidden 속성은 언제나 숨김: .btn·.lab-entry 처럼 display 를 정한 요소도 hidden 이면 보이지 않게 합니다 */
+[hidden] { display: none !important; }
 .hud-who { font-family: var(--display); font-size: 17px; display: flex; align-items: baseline; gap: 6px; }
 .hud-who small { font-family: var(--body); color: var(--mute); font-size: 12px; }
 .hud-stat { display: flex; align-items: center; gap: 5px; font-weight: 600; font-variant-numeric: tabular-nums; }

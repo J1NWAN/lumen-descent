@@ -7,10 +7,17 @@
 - 사용자는 한국어로 소통합니다. 화면 문구와 주석도 한국어입니다.
 
 ## 게시
-- 게임은 claude.ai 아티팩트로 게시합니다: https://claude.ai/artifact/F8D7dxYLdyp63ZqmS4kRdh
+- **공개 배포는 Cloudflare Pages** 입니다. GitHub 저장소가 연결되어 `main` 에 push하면 자동으로 빌드·배포됩니다.
+  - 빌드 명령 `python3 build.py`, 출력 폴더 `dist`(`dist/index.html`). `dist/` 는 git에 올리지 않습니다.
+  - 다른 브랜치에 push하면 미리보기 주소만 생기고 운영 주소는 바뀌지 않습니다.
+  - 대시보드 설정은 `docs/DEPLOY.md` 에 있습니다. Claude는 Cloudflare 계정에 접속할 수 없으니 설정 변경은 사용자에게 안내합니다.
+  - 일반 웹에는 `window.claude` 가 없습니다. 이것에 기대는 코드는 반드시 없을 때도 동작하게 만들고(관리자 연구소만 숨김),
+    `localStorage` 는 `tryLS` 로 감싸며, 외부 요청은 Google Fonts 말고 추가하지 않습니다. 바꾼 뒤 `tools/webcheck.py` 로 확인합니다.
+- **확인용으로 claude.ai 아티팩트**에도 게시합니다: https://claude.ai/artifact/F8D7dxYLdyp63ZqmS4kRdh
   - 같은 URL에 덮어써서 업데이트합니다(`url` 지정).
   - `user` 능력이 켜져 있습니다. 관리자 판별(`isOwner() || canEdit()`)에 씁니다.
 - 게시 전에 반드시 `python3 build.py` 로 다시 빌드합니다.
+  - 출력: `lumen-descent.html`(아티팩트용 조각), `build/test.html`(자동 테스트용), `dist/index.html`(웹 배포용 완전한 문서)
 
 ## 빌드 순서 (build.py)
 `engine → art → art2 → cardart → fx → rig → rigbake → heroes → mon/f1..f10 → monfx → rigart → ui → lab`
@@ -39,6 +46,9 @@
 - `python3 tools/riglab.py check|sheet|frames|big|hbig|hfr` 로 리그를 확인합니다.
 - `python3 tools/riglab.py cards OUT.png [ch|id ...] [--w=150] [--art]` 로 카드(또는 그림만 크게)를 확인합니다(빌드 후).
 - `python3 tools/e2e.py <sera|noa|rin> <w> <h> <tag> <rooms>` 로 통합 테스트를 돌립니다. 데스크톱 1280×800과 모바일 390×844 둘 다 봅니다.
+- `python3 tools/webcheck.py [w] [h] [tag]` 로 웹 배포본(dist/)을 HTTP로 띄워 점검합니다(아티팩트 객체 없음·localStorage 차단·외부 요청).
+  - 이 점검 환경에서는 프록시 때문에 Google Fonts 요청 일부가 실패할 수 있습니다. 경고로만 나오며 게임 문제가 아닙니다.
+- `hidden` 속성은 전역 `[hidden] { display: none !important; }` 로 항상 숨겨집니다. display 를 지정한 요소에도 hidden 을 믿고 써도 됩니다.
 - 스크린샷은 Read 도구로 직접 보고 판단합니다.
 
 ## 사용자 선호

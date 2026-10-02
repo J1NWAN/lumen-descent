@@ -18,9 +18,14 @@
 
 ## 실행
 ```bash
-python3 build.py          # → lumen-descent.html (단일 파일, 외부 JS 의존성 없음)
+python3 build.py          # → lumen-descent.html, dist/index.html (단일 파일, 외부 JS 의존성 없음)
 ```
-만든 `lumen-descent.html` 을 브라우저로 열면 됩니다.
+만든 `dist/index.html`(또는 `lumen-descent.html`)을 브라우저로 열면 됩니다.
+
+## 배포
+- **Cloudflare Pages**: GitHub 저장소를 연결해 두면 `main` 에 push할 때마다 자동 배포됩니다.
+  빌드 명령 `python3 build.py`, 출력 폴더 `dist`. 대시보드 설정 순서는 [docs/DEPLOY.md](docs/DEPLOY.md) 를 보세요.
+- **claude.ai 아티팩트**: 확인용으로 계속 씁니다. https://claude.ai/artifact/F8D7dxYLdyp63ZqmS4kRdh
 
 ## 구조
 | 경로 | 내용 |
@@ -39,6 +44,8 @@ python3 build.py          # → lumen-descent.html (단일 파일, 외부 JS 의
 | `src/rigart.js` | 전투 밖 초상화에 새 그림을 연결합니다 |
 | `tools/riglab.py` | 리그 검수 도구 (정지 자세 모음, 동작 프레임) |
 | `tools/e2e.py` | 통합 테스트 (새 게임을 자동으로 진행) |
+| `tools/webcheck.py` | 웹 배포 점검 (dist/ 를 HTTP로 띄워 아티팩트 객체·저장소 차단·외부 요청 확인) |
+| `docs/DEPLOY.md` | Cloudflare Pages 배포 안내 |
 | `tools/MONSTER_GUIDE.md` | 몬스터 리그 작성 가이드 (화풍·API·검증 절차) |
 | `preview/` | 세라 2세대 아트 시안 페이지 |
 
@@ -51,4 +58,5 @@ python3 tools/riglab.py sheet out.png mossClump      # 정지 자세 모음
 python3 tools/riglab.py frames out.png mossClump     # 공격/방어/피격/시전/사망 프레임
 python3 tools/riglab.py cards out.png sera --art      # 카드 그림 모음(빌드 후)
 python3 tools/e2e.py sera 1280 800 run1 6            # 방 6개 자동 진행
+python3 tools/webcheck.py                            # 일반 웹 환경 점검(모바일 390×844)
 ```
