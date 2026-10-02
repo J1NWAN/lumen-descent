@@ -1,0 +1,26 @@
+# 빌드 결과물 — `python3 build.py` 로 언제든 다시 만들 수 있습니다
+lumen-descent.html
+build/
+preview/sera-preview.html
+*.zip
+
+# 검수·테스트 중 생기는 이미지와 임시 파일
+/tmp/
+*.log
+riglab_*.html
+tools/sheets/tmp/
+
+# 파이썬·노드 부산물
+__pycache__/
+*.pyc
+node_modules/
+
+# 개인 환경·비밀 정보 (실수로라도 올리지 않도록)
+.env
+.env.*
+*.pem
+*.key
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
