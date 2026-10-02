@@ -4,6 +4,7 @@
   python3 tools/riglab.py frames OUT.png ID [scale]      # 동작별 프레임(공격/방어/피격/시전/사망)
   python3 tools/riglab.py heroes OUT.png                 # 영웅 정지 + 동작
   python3 tools/riglab.py check                          # 모든 몬스터 리그 생성 오류 검사
+  python3 tools/riglab.py cards OUT.png [ch|id ...] [--w=150] [--up] [--art] [--cols=8]  # 카드 모음(build/test.html 사용, build.py 먼저)
 몬스터 정의는 src/mon/*.js 에서 읽습니다.
 """
 import sys, asyncio, json
@@ -82,7 +83,31 @@ html,body{{margin:0;background:radial-gradient(ellipse at 50% 30%,#1c2a28,#070a0
     out = Path(f'/tmp/riglab_{os.getpid()}.html'); out.write_text(html)
     return out
 
+async def cards(args):
+    """빌드된 게임(build/test.html)의 cardHTML로 카드를 그대로 그려 봅니다."""
+    out = args[0]; rest = args[1:]
+    w = next((int(a[4:]) for a in rest if a.startswith('--w=')), 150)
+    up = '--up' in rest; cols = next((int(a[7:]) for a in rest if a.startswith('--cols=')), 8)
+    sel = [a for a in rest if not a.startswith('--')]
+    async with async_playwright() as p:
+        b = await p.chromium.launch()
+        pg = await b.new_page(viewport={'width': cols * (w + 16) + 40, 'height': 900}, device_scale_factor=2 if w < 170 else 1)
+        errs = []
+        pg.on('pageerror', lambda e: errs.append(str(e)))
+        await pg.goto('file://' + str(ROOT / 'build' / 'test.html')); await pg.wait_for_timeout(400)
+        n = await pg.evaluate(f'''(() => {{
+          const sel = {json.dumps(sel)}, U = window.__lumenUI, C = LD.CARDS;
+          const ids = Object.keys(C).filter(id => !sel.length || sel.includes(id) || sel.includes(C[id].ch));
+          document.querySelectorAll('#app,#bg,#fx,#fxc').forEach(e => e.remove()); document.body.style.background = '#0b0f13'; document.body.insertAdjacentHTML('beforeend', '<div id="cards" style="display:grid;grid-template-columns:repeat({cols},{w + 12}px);gap:18px 4px;padding:20px;background:#0b0f13;--cw:{w}px">' +
+            ids.map(id => '<div style="display:grid;justify-items:center;gap:4px">' + ({'true' if '--art' in rest else 'false'} ? '<div style="width:{w}px;height:{round(w*0.6)}px;border-radius:6px;overflow:hidden">' + ART.cardArt(C[id]) + '</div>' : U.cardHTML({{ id, up: {1 if up else 0} }})) + '<small style="color:#7a8a90;font:10px sans-serif">' + id + '</small></div>').join('') + '</div>');
+          return ids.length; }})()''')
+        await pg.wait_for_timeout(300)
+        await pg.locator('#cards').screenshot(path=out); print(out, n, '장')
+        if errs: print('페이지 오류:', '\n'.join(errs[:10]))
+        await b.close()
+
 async def run(cmd, args):
+    if cmd == 'cards': return await cards(args)
     page_path = build()
     async with async_playwright() as p:
         b = await p.chromium.launch()

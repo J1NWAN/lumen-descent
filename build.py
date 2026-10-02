@@ -5,7 +5,7 @@ root = Path(__file__).parent
 src = root / 'src'
 css = (src / 'style.css').read_text()
 mons = sorted((src / 'mon').glob('f*.js'), key=lambda p: int(p.stem.split('_')[0][1:]))
-files = ['engine.js', 'art.js', 'art2.js', 'fx.js', 'rig.js', 'rigbake.js', 'heroes.js'] + [f'mon/{m.name}' for m in mons] + ['monfx.js', 'rigart.js', 'ui.js', 'lab.js']
+files = ['engine.js', 'art.js', 'art2.js', 'cardart.js', 'fx.js', 'rig.js', 'rigbake.js', 'heroes.js'] + [f'mon/{m.name}' for m in mons] + ['monfx.js', 'rigart.js', 'ui.js', 'lab.js']
 js = '\n'.join((src / f).read_text() for f in files)
 html = f'''<title>루멘 디센트</title>
 <meta name="description" content="등불을 들고 태양이 떨어진 우물 속으로 내려가는 덱 빌딩 로그라이크">

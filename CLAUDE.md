@@ -13,7 +13,7 @@
 - 게시 전에 반드시 `python3 build.py` 로 다시 빌드합니다.
 
 ## 빌드 순서 (build.py)
-`engine → art → art2 → fx → rig → rigbake → heroes → mon/f1..f10 → monfx → rigart → ui → lab`
+`engine → art → art2 → cardart → fx → rig → rigbake → heroes → mon/f1..f10 → monfx → rigart → ui → lab`
 - 새 소스 파일을 추가하면 build.py 목록에도 넣어야 합니다.
 - `tools/riglab.py` 의 build() 목록도 함께 확인합니다.
 
@@ -28,12 +28,16 @@
 - 전투 화면은 상태가 바뀔 때마다 innerHTML로 다시 그립니다.
   - 리그 SVG는 `RIGS` 맵에 보관해 다시 붙입니다(`ui.js` 의 `rigFor` / `attachRigs`).
   - 적 행동은 `enemyAct` 가 처리합니다. 리그 동작이 타격 순간에 이르면 그때 이펙트와 결과를 처리합니다.
+- 카드 그림은 `cardart.js` 가 카드 id마다 고유 장면(`S.<id>`)으로 그립니다(뷰박스 120×72, 아래 가운데는 종류 띠가 덮음).
+  - 새 카드를 추가하면 장면도 함께 추가합니다. 없으면 `art.js` 의 옛 문양으로 대체됩니다.
+  - 카드 틀은 캐릭터마다 다릅니다(`style.css` 의 `.card.c-sera/c-noa/c-rin`): 비용석·이름판·그림 창 모양.
 - 정지 조각은 `rigbake.js` 가 비트맵으로 굽습니다.
   - 매 프레임 바뀌는 요소(불꽃, 눈 깜빡임, 회전 톱니, 빛 맥동)는 자동으로 감지해 벡터로 남깁니다.
   - 새 몬스터가 `tick` 에서 DOM을 바꾸면 자동으로 제외되니, 따로 표시할 필요는 없습니다.
 
 ## 검증 (디자인·그래픽 변경은 반드시 직접 눈으로 확인)
 - `python3 tools/riglab.py check|sheet|frames|big|hbig|hfr` 로 리그를 확인합니다.
+- `python3 tools/riglab.py cards OUT.png [ch|id ...] [--w=150] [--art]` 로 카드(또는 그림만 크게)를 확인합니다(빌드 후).
 - `python3 tools/e2e.py <sera|noa|rin> <w> <h> <tag> <rooms>` 로 통합 테스트를 돌립니다. 데스크톱 1280×800과 모바일 390×844 둘 다 봅니다.
 - 스크린샷은 Read 도구로 직접 보고 판단합니다.
 

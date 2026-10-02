@@ -12,6 +12,7 @@
   - 부위별 관절 리그로 움직입니다.
   - 원통 음영, 림라이트, 금속 하이라이트로 입체감을 냅니다.
   - 몬스터마다 공격·방어·강화·피격·사망 동작과 고유 이펙트가 있습니다.
+- **카드 103장 고유 일러스트**: 카드 이름에 맞는 장면을 모두 코드로 그립니다. 카드 틀도 캐릭터마다 재질과 모양이 다릅니다.
 - **카드별 전투 이펙트**: Canvas로 그립니다.
 - **밸런스 연구소**: 관리자 전용입니다. 봇 대량 시뮬레이션과 관전 기능이 있습니다.
 
@@ -27,6 +28,7 @@ python3 build.py          # → lumen-descent.html (단일 파일, 외부 JS 의
 | `src/engine.js` | 게임 규칙: 카드, 적, 층, 지도, 전투, 봇. `window.LD` |
 | `src/ui.js` | 화면과 입력, 전투 연출. 리그 동작과 이펙트를 연결합니다 |
 | `src/lab.js` | 밸런스 연구소(관리자) |
+| `src/cardart.js` | 카드 일러스트: 카드마다 고유 장면(103장) |
 | `src/fx.js` | 배경 장면과 카드·몬스터 이펙트 (Canvas) |
 | `src/art.js`, `src/art2.js` | 1세대 SVG 그림. 아이콘·카드 그림·대체용 |
 | `src/rig.js` | 2세대 리그 엔진: 그리기 키트, 뼈대 런타임, 유형별 동작 생성기 |
@@ -47,5 +49,6 @@ python3 build.py
 python3 tools/riglab.py check                        # 모든 몬스터 리그 생성·동작 오류 검사
 python3 tools/riglab.py sheet out.png mossClump      # 정지 자세 모음
 python3 tools/riglab.py frames out.png mossClump     # 공격/방어/피격/시전/사망 프레임
+python3 tools/riglab.py cards out.png sera --art      # 카드 그림 모음(빌드 후)
 python3 tools/e2e.py sera 1280 800 run1 6            # 방 6개 자동 진행
 ```
