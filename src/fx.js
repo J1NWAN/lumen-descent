@@ -10,6 +10,9 @@ const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 const easeIn = t => t * t * t;
+// 화면 배율(scale.js): 이펙트는 배율 좌표로 그리고, 캔버스 변환에 배율을 곱해 화면과 같이 커집니다
+const ZF = () => (root.UIZ ? root.UIZ.z : 1);
+const VW = () => innerWidth / ZF(), VH = () => innerHeight / ZF();
 
 /* =====================================================================
    배경
@@ -451,7 +454,7 @@ function tickFX(t, fixedDt) {
   if (FX.pend.length) { const due = FX.pend.filter(q => q.at <= FX.now); FX.pend = FX.pend.filter(q => q.at > FX.now); due.forEach(q => FX.parts.push(Object.assign({ age: 0 }, q.p))); }
   const x = FX.ctx, d = FX.dpr;
   x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, FX.cv.width, FX.cv.height);
-  x.setTransform(d, 0, 0, d, 0, 0);
+  const dz = d * ZF(); x.setTransform(dz, 0, 0, dz, 0, 0);
   const keep = [];
   for (const p of FX.parts) {
     p.age += dt; const k = p.age / p.life;
@@ -488,7 +491,7 @@ function tickFX(t, fixedDt) {
         x.beginPath(); x.ellipse(p.x, p.y, p.r0 + (p.r1 - p.r0) * easeOut(k), (p.r0 + (p.r1 - p.r0) * easeOut(k)) * (p.sq || 1), 0, 0, TAU); x.stroke();
         break;
       case 'flash':
-        x.globalAlpha = a * p.op; x.fillStyle = p.c; x.fillRect(0, 0, innerWidth, innerHeight);
+        x.globalAlpha = a * p.op; x.fillStyle = p.c; x.fillRect(0, 0, VW(), VH());
         break;
       case 'shape':
         p.draw(x, k, p, dt);
@@ -631,7 +634,7 @@ function flameBurst(cx, cy, n, spd, delay) {
 function ghostOf(sel, dx, dy, col, life, delay) {
   const src = document.querySelector(sel); if (!src) return;
   setTimeout(() => {
-    const r = src.getBoundingClientRect();
+    const r = root.UIZ ? root.UIZ.rect(src.getBoundingClientRect()) : src.getBoundingClientRect();
     const g = document.createElement('div'); g.className = 'fx-ghost';
     g.innerHTML = src.innerHTML;
     g.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;--gx:${dx}px;--gy:${dy}px;--gc:${col};animation-duration:${life}ms`;
@@ -754,7 +757,7 @@ V.whirl = c => {
   return { d: 80, per: 110 };
 };
 V.lance = c => {
-  const f = c.from, y = c.foes.reduce((a, r) => a + r.y, 0) / c.foes.length, endX = innerWidth + 40;
+  const f = c.from, y = c.foes.reduce((a, r) => a + r.y, 0) / c.foes.length, endX = VW() + 40;
   add({ kind: 'shape', life: 0.6, draw(x, k) {
     const e = easeOut(Math.min(1, k / 0.3)), al = k < 0.3 ? 1 : 1 - (k - 0.3) / 0.7, hx = lerp(f.x + 40, endX, e);
     for (const [w, o, col] of [[34, 0.2, c.S.c], [18, 0.5, c.S.c], [6, 1, c.S.core]]) { x.globalAlpha = al * o; x.strokeStyle = col; x.lineWidth = w; x.lineCap = 'round'; x.beginPath(); x.moveTo(f.x + 40, y); x.lineTo(hx, y); x.stroke(); }
@@ -826,7 +829,7 @@ V.sunbeam = c => {
 V.surge = c => { const p = c.from; flameBurst(p.x, p.y, 60, 520); add({ kind: 'ring', x: p.x, y: p.y, r0: 10, r1: 160, w: 12, c: '#ffb45a', life: 0.6 }); flash('#ff8a2a', 0.15, 0.3); V.gather(c); return { d: 0 }; };
 V.phoenix = c => {
   const y = c.foes.reduce((a, r) => a + r.y, 0) / c.foes.length - 20, f = c.from;
-  add({ kind: 'proj', x0: f.x, y0: f.y - 60, x1: innerWidth + 100, y1: y, arcH: -40, life: 0.7, draw(x, k) {
+  add({ kind: 'proj', x0: f.x, y0: f.y - 60, x1: VW() + 100, y1: y, arcH: -40, life: 0.7, draw(x, k) {
     const flap = Math.sin(k * 30) * 0.4; x.scale(1.7, 1.7);
     glowDisc(x, 0, 0, 90, 'rgba(255,140,40,.8)', 0.8); x.globalAlpha = 1;
     x.fillStyle = '#ffb040'; x.strokeStyle = '#fff1c8'; x.lineWidth = 2;
@@ -834,8 +837,8 @@ V.phoenix = c => {
     x.fillStyle = '#fff1c8'; x.beginPath(); x.ellipse(6, 0, 22, 9, 0, 0, TAU); x.fill();
     x.fillStyle = '#ff6a1a'; x.beginPath(); x.moveTo(-10, 0); x.lineTo(-80, -12); x.lineTo(-70, 0); x.lineTo(-80, 12); x.closePath(); x.fill();
   }, trail(px, py) { add({ kind: 'dot', x: px + rand(-20, 0), y: py + rand(-20, 20), vx: rand(-80, -20), vy: rand(-40, 40), life: 0.6, r: rand(3, 6), c: Math.random() < 0.5 ? '#ff8a2a' : '#ffd27a', shrink: true }); } });
-  c.foes.forEach(r => { const tt = (r.x - f.x) / (innerWidth + 100 - f.x) * 700; hitBurst(r.x, r.y, c.S, 16, tt); flameBurst(r.x, r.y, 20, 300, tt); });
-  return { d: Math.max(80, (c.foes[0].x - f.x) / (innerWidth + 100 - f.x) * 700), per: 80 };
+  c.foes.forEach(r => { const tt = (r.x - f.x) / (VW() + 100 - f.x) * 700; hitBurst(r.x, r.y, c.S, 16, tt); flameBurst(r.x, r.y, 20, 300, tt); });
+  return { d: Math.max(80, (c.foes[0].x - f.x) / (VW() + 100 - f.x) * 700), per: 80 };
 };
 /* ---------- 노아 ---------- */
 function cloud(cx, cy, col, n, delay) { for (let i = 0; i < n; i++) add({ kind: 'dot', x: cx + rand(-24, 24), y: cy + rand(-24, 16), vx: rand(-60, 60), vy: rand(-70, 10), drag: 1.4, life: rand(0.9, 1.5), r: rand(10, 20), c: col, add: false, fade: 'in', delay: (delay || 0) + i * 10 }); }
@@ -857,9 +860,9 @@ V.splash = c => {
 V.water = c => { V.slash(Object.assign({}, c, { S: STYLE.noa, ch: 'noa' })); return { d: 40, per: 110 }; };
 V.tide = c => {
   const y0 = (c.from.y + 90);
-  add({ kind: 'shape', life: 1, keep: 1, draw(x, k) { const al = Math.sin(k * Math.PI); x.globalAlpha = al; for (let j = 0; j < 3; j++) { x.strokeStyle = j ? '#4fe0cc' : '#bff4ff'; x.lineWidth = 4 - j; x.beginPath(); for (let px = -20; px <= innerWidth + 20; px += 12) { const py = y0 - j * 14 + Math.sin(px * 0.02 + k * 10 + j) * 8; px < -10 ? x.moveTo(px, py) : x.lineTo(px, py); } x.stroke(); } } });
-  add({ kind: 'shape', life: 1.1, draw(x, k) { const al = Math.sin(k * Math.PI); const mx = innerWidth / 2, my = 80; glowDisc(x, mx, my, 60, 'rgba(200,255,250,.8)', al * 0.6); x.globalAlpha = al; x.fillStyle = '#e8fffb'; x.beginPath(); x.arc(mx, my, 18, 0, TAU); x.fill(); x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(mx + 8, my - 5, 16, 0, TAU); x.fill(); } });
-  for (let i = 0; i < 30; i++) add({ kind: 'dot', x: rand(0, innerWidth), y: y0, vx: rand(-20, 20), vy: rand(-140, -40), life: rand(0.6, 1), r: rand(1.6, 3), c: i % 2 ? '#9ff0e2' : '#4fe0cc', fade: 'in' });
+  add({ kind: 'shape', life: 1, keep: 1, draw(x, k) { const al = Math.sin(k * Math.PI); x.globalAlpha = al; for (let j = 0; j < 3; j++) { x.strokeStyle = j ? '#4fe0cc' : '#bff4ff'; x.lineWidth = 4 - j; x.beginPath(); for (let px = -20; px <= VW() + 20; px += 12) { const py = y0 - j * 14 + Math.sin(px * 0.02 + k * 10 + j) * 8; px < -10 ? x.moveTo(px, py) : x.lineTo(px, py); } x.stroke(); } } });
+  add({ kind: 'shape', life: 1.1, draw(x, k) { const al = Math.sin(k * Math.PI); const mx = VW() / 2, my = 80; glowDisc(x, mx, my, 60, 'rgba(200,255,250,.8)', al * 0.6); x.globalAlpha = al; x.fillStyle = '#e8fffb'; x.beginPath(); x.arc(mx, my, 18, 0, TAU); x.fill(); x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(mx + 8, my - 5, 16, 0, TAU); x.fill(); } });
+  for (let i = 0; i < 30; i++) add({ kind: 'dot', x: rand(0, VW()), y: y0, vx: rand(-20, 20), vy: rand(-140, -40), life: rand(0.6, 1), r: rand(1.6, 3), c: i % 2 ? '#9ff0e2' : '#4fe0cc', fade: 'in' });
   return { d: 0 };
 };
 V.spray = c => {
@@ -936,7 +939,7 @@ V.bubble = c => {
 };
 V.flood = c => {
   add({ kind: 'shape', life: 1.1, draw(x, k) {
-    const e = easeOut(Math.min(1, k / 0.45)), al = k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5, W = innerWidth, H = innerHeight, top = lerp(H, H * 0.25, e);
+    const e = easeOut(Math.min(1, k / 0.45)), al = k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5, W = VW(), H = VH(), top = lerp(H, H * 0.25, e);
     const g = x.createLinearGradient(0, top, 0, H); g.addColorStop(0, 'rgba(230,255,255,.8)'); g.addColorStop(0.2, 'rgba(60,180,220,.55)'); g.addColorStop(1, 'rgba(10,60,100,.6)');
     x.globalAlpha = al; x.fillStyle = g; x.beginPath(); x.moveTo(0, H); x.lineTo(0, top);
     for (let px = 0; px <= W; px += 20) x.lineTo(px, top + Math.sin(px * 0.015 + k * 12) * 18);
@@ -1012,11 +1015,11 @@ V.finale = c => {
 };
 /* ---------- 공용 ---------- */
 V.draw = c => {
-  const from = c.pile || { x: 40, y: innerHeight - 40 }, to = c.hand || { x: innerWidth / 2, y: innerHeight - 90 }, n = c.n || 2;
+  const from = c.pile || { x: 40, y: VH() - 40 }, to = c.hand || { x: VW() / 2, y: VH() - 90 }, n = c.n || 2;
   for (let i = 0; i < n; i++) add({ kind: 'proj', x0: from.x, y0: from.y, x1: to.x + (i - (n - 1) / 2) * 50, y1: to.y, arcH: 80, life: 0.45, delay: i * 90, draw(x) { x.rotate(-0.2); x.scale(1.6, 1.6); glowDisc(x, 0, 0, 34, rgba(c.S.c, 0.7), 0.7); x.globalAlpha = 1; x.fillStyle = '#1a1210'; x.strokeStyle = c.S.c; x.lineWidth = 2; x.beginPath(); x.rect(-12, -17, 24, 34); x.fill(); x.stroke(); x.fillStyle = c.S.core; x.fillRect(-7, -10, 14, 8); x.fillStyle = rgba(c.S.c, 0.6); x.fillRect(-7, 2, 14, 2); x.fillRect(-7, 7, 10, 2); } });
   return { d: 0 };
 };
-V.lightOrb = c => { const o = c.orb || { x: 50, y: innerHeight - 90 }, p = c.from; add({ kind: 'shape', life: 0.8, draw(x, k) { glowDisc(x, p.x, p.y, 130, 'rgba(255,220,120,.8)', Math.sin(k * Math.PI) * 0.6); } }); starSpark(p.x, p.y, 80, '#ffe08a'); for (let i = 0; i < 16; i++) add({ kind: 'proj', x0: p.x + rand(-40, 40), y0: p.y + rand(-40, 40), x1: o.x, y1: o.y, arcH: rand(20, 80), life: rand(0.4, 0.6), delay: i * 20, draw(x) { glowDisc(x, 0, 0, 12, 'rgba(255,220,120,.9)', 0.9); x.globalAlpha = 1; x.fillStyle = '#fff'; x.beginPath(); x.arc(0, 0, 2, 0, TAU); x.fill(); } }); add({ kind: 'ring', x: o.x, y: o.y, r0: 10, r1: 60, w: 4, c: '#ffe08a', life: 0.4, delay: 450 }); return { d: 0 }; };
+V.lightOrb = c => { const o = c.orb || { x: 50, y: VH() - 90 }, p = c.from; add({ kind: 'shape', life: 0.8, draw(x, k) { glowDisc(x, p.x, p.y, 130, 'rgba(255,220,120,.8)', Math.sin(k * Math.PI) * 0.6); } }); starSpark(p.x, p.y, 80, '#ffe08a'); for (let i = 0; i < 16; i++) add({ kind: 'proj', x0: p.x + rand(-40, 40), y0: p.y + rand(-40, 40), x1: o.x, y1: o.y, arcH: rand(20, 80), life: rand(0.4, 0.6), delay: i * 20, draw(x) { glowDisc(x, 0, 0, 12, 'rgba(255,220,120,.9)', 0.9); x.globalAlpha = 1; x.fillStyle = '#fff'; x.beginPath(); x.arc(0, 0, 2, 0, TAU); x.fill(); } }); add({ kind: 'ring', x: o.x, y: o.y, r0: 10, r1: 60, w: 4, c: '#ffe08a', life: 0.4, delay: 450 }); return { d: 0 }; };
 V.flashbang = c => { flash('#fff', 0.55, 0.35); c.foes.forEach(r => { add({ kind: 'ring', x: r.x, y: r.y, r0: 10, r1: 90, w: 5, c: '#fff', life: 0.5 }); for (let i = 0; i < 3; i++) add({ kind: 'shape', life: 0.9, draw(x, k) { const a = k * 8 + i * 2.1; x.globalAlpha = 1 - k; x.fillStyle = '#fff6c8'; x.beginPath(); x.arc(r.x + Math.cos(a) * 30, r.y - r.h * 0.45 + Math.sin(a) * 8, 4, 0, TAU); x.fill(); } }); }); return { d: 60, per: 40 }; };
 V.heal = c => { const p = c.from; add({ kind: 'shape', life: 1, draw(x, k) { glowDisc(x, p.x, p.y + 20, 140, 'rgba(120,240,120,.6)', Math.sin(k * Math.PI) * 0.6); } }); add({ kind: 'ring', x: p.x, y: p.y + 86, r0: 20, r1: 110, w: 4, c: '#9ff08a', life: 0.7, sq: 0.3 }); for (let i = 0; i < 20; i++) add({ kind: 'shape', life: rand(0.8, 1.2), delay: i * 30, draw: ((ox, oy) => (x, k) => { const px = p.x + ox, py = p.y + oy - k * 90; const al = Math.sin(k * Math.PI); glowDisc(x, px, py, 22, 'rgba(140,240,120,.8)', al * 0.7); x.globalAlpha = al; x.fillStyle = i % 2 ? '#9ff08a' : '#f0fff0'; x.fillRect(px - 9, py - 3, 18, 6); x.fillRect(px - 3, py - 9, 6, 18); })(rand(-50, 50), rand(-20, 60)) }); return { d: 0 }; };
 V.lantern = c => { const xs = c.foes.map(r => r.x), cx = (Math.min(...xs) + Math.max(...xs)) / 2, w = Math.max(...xs) - Math.min(...xs) + 220; add({ kind: 'arc', x: cx, y: c.foes[0].y + 30, rx: w * 0.55, ry: 80, rot: 0, a0: Math.PI * 1.05, a1: Math.PI * 1.95, w: 14, c: '#ffb45a', core: '#fff6d8', life: 0.6 }); c.foes.forEach((r, i) => { glowBurst(r.x, r.y, 80 + i * 40); hitBurst(r.x, r.y, STYLE.any, 10, 80 + i * 40); }); return { d: 90, per: 40 }; };
@@ -1281,7 +1284,7 @@ const API = {
   debuff(x, y, c) { for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; add({ kind: 'dot', x: x + Math.cos(a) * 50, y: y + Math.sin(a) * 30, vx: -Math.cos(a) * 90, vy: -Math.sin(a) * 60, life: 0.55, r: 2.6, c: c || '#c79aff' }); } },
   guardHex(x, y) { add({ kind: 'shape', life: 0.5, draw(cx, k) { const r = 56 * (0.7 + 0.4 * Math.min(1, k * 3)); cx.globalAlpha = 1 - k; cx.strokeStyle = '#8fd0ff'; cx.lineWidth = 3; cx.beginPath(); for (let i = 0; i <= 6; i++) { const an = i * Math.PI / 3 - Math.PI / 2; const px = x + Math.cos(an) * r, py = y + Math.sin(an) * r * 1.1; i ? cx.lineTo(px, py) : cx.moveTo(px, py); } cx.stroke(); } }); },
   ignite(x, y) { add({ kind: 'ring', x, y, r0: 10, r1: 110, w: 10, c: '#ff9a3a', life: 0.5 }); flash('#ff8a2a', 0.18, 0.25); flameBurst(x, y, 40, 460); },
-  tide(y, up) { for (let i = 0; i < 40; i++) add({ kind: 'dot', x: rand(0, innerWidth), y: y + rand(-6, 6), vx: rand(-30, 30), vy: up ? rand(-120, -40) : rand(20, 80), life: rand(0.6, 1.1), r: rand(1.5, 3), c: i % 2 ? '#9ff0e2' : '#4fe0cc', fade: 'in' }); },
+  tide(y, up) { for (let i = 0; i < 40; i++) add({ kind: 'dot', x: rand(0, VW()), y: y + rand(-6, 6), vx: rand(-30, 30), vy: up ? rand(-120, -40) : rand(20, 80), life: rand(0.6, 1.1), r: rand(1.5, 3), c: i % 2 ? '#9ff0e2' : '#4fe0cc', fade: 'in' }); },
   death(x, y, w, h, c) {
     for (let i = 0; i < 60; i++) add({ kind: 'dot', x: x + rand(-w / 2, w / 2), y: y + rand(-h / 2, h / 2), vx: rand(-60, 60), vy: rand(-180, -40), drag: 1.2, life: rand(0.6, 1.3), r: rand(1.6, 4), c: i % 3 ? c : '#fff', shrink: true });
     add({ kind: 'ring', x, y, r0: 10, r1: Math.max(w, h) * 0.8, w: 6, c, life: 0.6 });

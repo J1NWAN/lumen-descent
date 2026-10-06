@@ -103,7 +103,7 @@ function attachRigs(root) {
     }
   });
 }
-function rigPt(r, sock) { const p = r && (r.screen(sock) || r.screen('core')); return p ? { x: p[0], y: p[1] } : null; }
+function rigPt(r, sock) { const p = r && (r.screen(sock) || r.screen('core')); return p ? { x: UIZ.loc(p[0]), y: UIZ.loc(p[1]) } : null; }
 const artCache = {};
 function cardArtFor(id) { return artCache[id] || (artCache[id] = A.cardArt(L.CARDS[id])); }
 
@@ -118,7 +118,7 @@ function tipInit() {
     let left = x + 14, top = y + 16;
     if (left + r.width > innerWidth - 8) left = x - r.width - 14;
     if (top + r.height > innerHeight - 8) top = y - r.height - 12;
-    tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+    tip.style.left = UIZ.loc(Math.max(8, left)) + 'px'; tip.style.top = UIZ.loc(Math.max(8, top)) + 'px';
   }
   document.addEventListener('pointermove', e => {
     if (e.pointerType !== 'mouse') return;
@@ -497,7 +497,7 @@ function showMap() {
     requestAnimationFrame(() => {
       const r = first.getBoundingClientRect(), sr = sc.getBoundingClientRect();
       sc.style.scrollBehavior = 'auto';
-      sc.scrollTop += r.top - sr.top - sr.height * 0.35;
+      sc.scrollTop += UIZ.loc(r.top - sr.top - sr.height * 0.35);
       sc.style.scrollBehavior = '';
     });
   }
@@ -673,7 +673,7 @@ function bindCard(el) {
       $$('.ent.foe', $('#field')).forEach(f => { if (L.CARDS[C.hand[i].id].tg === 'e' && !f.classList.contains('dead')) f.classList.add('targetable'); });
     }
     if (dragging) {
-      el.style.transform = `translate(${+el.dataset.x + dx}px, ${dy - el.offsetHeight * 0.2}px) scale(1.06)`;
+      el.style.transform = `translate(${+el.dataset.x + UIZ.loc(dx)}px, ${UIZ.loc(dy) - el.offsetHeight * 0.2}px) scale(1.06)`;
       const over = enemyAt(e.clientX, e.clientY);
       $$('.ent.targeted').forEach(t => t.classList.remove('targeted'));
       if (over && L.CARDS[C.hand[i].id].tg === 'e') over.classList.add('targeted');
@@ -773,7 +773,7 @@ function endTurn() {
 }
 
 /* 이벤트 → 떠오르는 숫자, 흔들림, 소리 */
-function rectOf(uid) { const el = uid ? document.querySelector(`.ent[data-uid="${uid}"] .art`) : null; return el ? el.getBoundingClientRect() : null; }
+function rectOf(uid) { const el = uid ? document.querySelector(`.ent[data-uid="${uid}"] .art`) : null; return el ? UIZ.rect(el.getBoundingClientRect()) : null; }
 function centerOf(r) { return { x: r.left + r.width / 2, y: r.top + r.height * 0.5 }; }
 function cardStyle(id) { const ch = L.CARDS[id] ? L.CARDS[id].ch : 'any'; return ch === 'sera' || ch === 'noa' || ch === 'rin' ? ch : 'any'; }
 const CHCOL = { sera: '#ffb45a', noa: '#5fe0cc', rin: '#b48cff' };
@@ -781,7 +781,7 @@ function fxContext(e) {
   const pr = rectOf('p'), rr = r => ({ x: r.left + r.width / 2, y: r.top + r.height * 0.5, w: r.width, h: r.height });
   const foes = L.alive(C).map(x => rectOf(x.uid)).filter(Boolean).map(rr);
   const dp = $('#p-draw'), dc = $('#p-disc'), hd = $('#hand'), orb = $('.light-orb');
-  const mid = el => { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  const mid = el => { if (!el) return null; const r = UIZ.rect(el.getBoundingClientRect()); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
   const tr = e.to ? rectOf(e.to) : null;
   return { ch: cardStyle(e.id), from: pr ? rr(pr) : { x: 150, y: 300, w: 120, h: 180 }, tgt: tr ? rr(tr) : null, foes, pile: mid(dp), disc: mid(dc), hand: mid(hd), orb: mid(orb), combo: C.cardsThisTurn };
 }
@@ -875,8 +875,8 @@ function processEvents(opt) {
         }
         sound.die = 1; break;
       }
-      case 'tide': { const t = $('#tide'); if (t) { t.classList.remove('flip'); void t.offsetWidth; t.classList.add('flip'); } if (!cardFx) { const f = $('#field'); if (f) { const fr = f.getBoundingClientRect(); FX.tide(fr.bottom - 20, C.tide === 'high'); } } sound.flip = 1; break; }
-      case 'light': { const o = $('.light-orb'); if (o) { const rr = o.getBoundingClientRect(); const d = document.createElement('div'); d.className = 'float label fire'; d.textContent = `빛 +${e.n}`; d.style.left = rr.left + rr.width / 2 + 'px'; d.style.top = rr.top - 10 + 'px'; layer.appendChild(d); setTimeout(() => d.remove(), 1400); if (!cardFx) FX.buff(rr.left + rr.width / 2, rr.top, '#ffd07a'); } break; }
+      case 'tide': { const t = $('#tide'); if (t) { t.classList.remove('flip'); void t.offsetWidth; t.classList.add('flip'); } if (!cardFx) { const f = $('#field'); if (f) { const fr = UIZ.rect(f.getBoundingClientRect()); FX.tide(fr.bottom - 20, C.tide === 'high'); } } sound.flip = 1; break; }
+      case 'light': { const o = $('.light-orb'); if (o) { const rr = UIZ.rect(o.getBoundingClientRect()); const d = document.createElement('div'); d.className = 'float label fire'; d.textContent = `빛 +${e.n}`; d.style.left = rr.left + rr.width / 2 + 'px'; d.style.top = rr.top - 10 + 'px'; layer.appendChild(d); setTimeout(() => d.remove(), 1400); if (!cardFx) FX.buff(rr.left + rr.width / 2, rr.top, '#ffd07a'); } break; }
       case 'addcard': toast(`「${L.CARDS[e.id].n}」 ${e.n}장이 ${{ hand: '손', draw: '뽑을 더미', disc: '버린 더미' }[e.where] || '덱'}에 섞였습니다`); break;
       case 'tonic': { const pr = rectOf('p'); if (pr) { const pc = centerOf(pr); FX.buff(pc.x, pc.y, '#9ff0e2'); } break; }
     }

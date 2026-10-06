@@ -34,6 +34,7 @@ python3 build.py          # → lumen-descent.html, dist/index.html (단일 파�
 | `src/ui.js` | 화면과 입력, 전투 연출. 리그 동작과 이펙트를 연결합니다 |
 | `src/lab.js` | 밸런스 연구소(관리자) |
 | `src/cardart.js` | 카드 일러스트: 카드마다 고유 장면(103장) |
+| `src/scale.js` | 화면 배율: 1920×1080보다 큰 모니터에서 화면 전체를 같은 비율로 키웁니다 |
 | `src/fx.js` | 배경 장면과 카드·몬스터 이펙트 (Canvas) |
 | `src/art.js`, `src/art2.js` | 1세대 SVG 그림. 아이콘·카드 그림·대체용 |
 | `src/rig.js` | 2세대 리그 엔진: 그리기 키트, 뼈대 런타임, 유형별 동작 생성기 |

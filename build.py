@@ -5,7 +5,7 @@ root = Path(__file__).parent
 src = root / 'src'
 css = (src / 'style.css').read_text()
 mons = sorted((src / 'mon').glob('f*.js'), key=lambda p: int(p.stem.split('_')[0][1:]))
-files = ['engine.js', 'art.js', 'art2.js', 'cardart.js', 'fx.js', 'rig.js', 'rigbake.js', 'heroes.js'] + [f'mon/{m.name}' for m in mons] + ['monfx.js', 'rigart.js', 'ui.js', 'lab.js']
+files = ['engine.js', 'art.js', 'art2.js', 'cardart.js', 'scale.js', 'fx.js', 'rig.js', 'rigbake.js', 'heroes.js'] + [f'mon/{m.name}' for m in mons] + ['monfx.js', 'rigart.js', 'ui.js', 'lab.js']
 js = '\n'.join((src / f).read_text() for f in files)
 # 머리(제목·설명·폰트·스타일)와 본문(화면 뼈대·스크립트)을 나눠 두고, 출력마다 필요한 방식으로 감쌉니다
 TITLE = '루멘 디센트'

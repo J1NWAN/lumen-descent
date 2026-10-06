@@ -356,9 +356,9 @@ function bindSurv(el, a, chars) {
     tip.innerHTML = `<b>${i === n - 1 ? '최종 승리' : (i + 1) + '층 도달'}</b>` + chars.map(ch => `<div><i style="background:${COL[ch]}"></i>${esc(L.CHARS[ch].n)}<span class="num">${f1(a.surv[ch][i])}%</span></div>`).join('');
     tip.hidden = false;
     const sb = svg.getBoundingClientRect(), wb = wrap.getBoundingClientRect();
-    const px = sb.left - wb.left + x / svg.viewBox.baseVal.width * sb.width;
+    const px = UIZ.loc(sb.left - wb.left + x / svg.viewBox.baseVal.width * sb.width);
     const tw = tip.offsetWidth;
-    tip.style.left = Math.max(4, Math.min(wb.width - tw - 4, px + (px > wb.width / 2 ? -tw - 14 : 14))) + 'px';
+    tip.style.left = Math.max(4, Math.min(UIZ.loc(wb.width) - tw - 4, px + (px > UIZ.loc(wb.width) / 2 ? -tw - 14 : 14))) + 'px';
     tip.style.top = '8px';
   };
   const hide = () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); $$('.pt.on', svg).forEach(p => p.classList.remove('on')); };

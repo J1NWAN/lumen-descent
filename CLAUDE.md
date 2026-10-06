@@ -20,7 +20,7 @@
   - 출력: `lumen-descent.html`(아티팩트용 조각), `build/test.html`(자동 테스트용), `dist/index.html`(웹 배포용 완전한 문서)
 
 ## 빌드 순서 (build.py)
-`engine → art → art2 → cardart → fx → rig → rigbake → heroes → mon/f1..f10 → monfx → rigart → ui → lab`
+`engine → art → art2 → cardart → scale → fx → rig → rigbake → heroes → mon/f1..f10 → monfx → rigart → ui → lab`
 - 새 소스 파일을 추가하면 build.py 목록에도 넣어야 합니다.
 - `tools/riglab.py` 의 build() 목록도 함께 확인합니다.
 
@@ -38,6 +38,10 @@
 - 카드 그림은 `cardart.js` 가 카드 id마다 고유 장면(`S.<id>`)으로 그립니다(뷰박스 120×72, 아래 가운데는 종류 띠가 덮음).
   - 새 카드를 추가하면 장면도 함께 추가합니다. 없으면 `art.js` 의 옛 문양으로 대체됩니다.
   - 카드 틀은 캐릭터마다 다릅니다(`style.css` 의 `.card.c-sera/c-noa/c-rin`): 비용석·이름판·그림 창 모양.
+- 화면 배율은 `scale.js` 가 맡습니다. 1920×1080보다 큰 화면에서는 `body` 에 CSS zoom(`UIZ.z`, 최소 1)을 겁니다.
+  - `getBoundingClientRect`·`clientX` 는 화면 좌표이고, `style.left`·transform·스크롤·이펙트 캔버스는 배율 좌표입니다. `UIZ.rect` / `UIZ.loc` 로 바꿉니다.
+  - CSS 에서 `vh`·`vw` 로 화면 크기를 맞출 때는 `calc(60vh / var(--z, 1))` 처럼 배율로 나눕니다.
+  - 전투 무대(`.field`)와 손패 줄(`.deckbar`)은 최대 1920px 너비로 가운데에 모입니다(초광폭 화면).
 - 정지 조각은 `rigbake.js` 가 비트맵으로 굽습니다.
   - 매 프레임 바뀌는 요소(불꽃, 눈 깜빡임, 회전 톱니, 빛 맥동)는 자동으로 감지해 벡터로 남깁니다.
   - 새 몬스터가 `tick` 에서 DOM을 바꾸면 자동으로 제외되니, 따로 표시할 필요는 없습니다.
