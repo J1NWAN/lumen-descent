@@ -17,7 +17,12 @@
   - 같은 URL에 덮어써서 업데이트합니다(`url` 지정).
   - `user` 능력이 켜져 있습니다. 관리자 판별(`isOwner() || canEdit()`)에 씁니다.
 - 게시 전에 반드시 `python3 build.py` 로 다시 빌드합니다.
-  - 출력: `lumen-descent.html`(아티팩트용 조각), `build/test.html`(자동 테스트용), `dist/index.html`(웹 배포용 완전한 문서)
+  - 출력: `lumen-descent.html`(아티팩트용 조각), `build/test.html`(자동 테스트용), `dist/`(웹 배포용: 게임 `index.html` + 콘텐츠 페이지)
+- **웹 콘텐츠 페이지**(dist 전용, 아티팩트에는 없음): `/about/ /guide/ /heroes/ /cards/ /bestiary/ /relics/ /privacy/ /contact/ /404.html`, robots.txt, sitemap.xml(도메인 있을 때), ads.txt(퍼블리셔 ID 있을 때).
+  - 생성기 `web/render.py`, 직접 쓴 글 `web/content.py`, 스타일 `web/site.css`. 설정은 `site.json`(비면 경고·자리표시자, `--release` 는 실패). 도메인·이메일·ID는 지어내지 않습니다.
+  - 데이터 `web/data.json`·그림 `web/img/` 는 `python3 build.py --export`(Playwright)로 만들어 커밋합니다. 엔진·그림이 바뀌면 빌드가 「오래됐다」고 경고하니 다시 내보냅니다.
+  - 새 카드·몬스터를 추가하면 `web/content.py` 의 설명(몬스터는 `MON`)도 함께 씁니다. 공략 글은 `engine.js` 규칙과 맞아야 합니다.
+  - 제목 화면의 안내 링크는 `window.__lumenWeb`(dist 빌드에서만 켬)일 때만 보입니다.
 
 ## 빌드 순서 (build.py)
 `engine → art → art2 → cardart → scale → fx → rig → rigbake → heroes → mon/f1..f10 → monfx → rigart → ui → lab`
@@ -50,7 +55,7 @@
 - `python3 tools/riglab.py check|sheet|frames|big|hbig|hfr` 로 리그를 확인합니다.
 - `python3 tools/riglab.py cards OUT.png [ch|id ...] [--w=150] [--art]` 로 카드(또는 그림만 크게)를 확인합니다(빌드 후).
 - `python3 tools/e2e.py <sera|noa|rin> <w> <h> <tag> <rooms>` 로 통합 테스트를 돌립니다. 데스크톱 1280×800과 모바일 390×844 둘 다 봅니다.
-- `python3 tools/webcheck.py [w] [h] [tag]` 로 웹 배포본(dist/)을 HTTP로 띄워 점검합니다(아티팩트 객체 없음·localStorage 차단·외부 요청).
+- `python3 tools/webcheck.py [w] [h] [tag]` 로 웹 배포본(dist/)을 HTTP로 띄워 점검합니다(아티팩트 객체 없음·localStorage 차단·외부 요청·콘텐츠 페이지 200·내부 링크).
   - 이 점검 환경에서는 프록시 때문에 Google Fonts 요청 일부가 실패할 수 있습니다. 경고로만 나오며 게임 문제가 아닙니다.
 - `hidden` 속성은 전역 `[hidden] { display: none !important; }` 로 항상 숨겨집니다. display 를 지정한 요소에도 hidden 을 믿고 써도 됩니다.
 - 스크린샷은 Read 도구로 직접 보고 판단합니다.

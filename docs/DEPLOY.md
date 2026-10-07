@@ -4,8 +4,9 @@
 GitHub 저장소를 한 번 연결해 두면 이후 `main` 에 push할 때마다 자동으로 다시 빌드·배포됩니다.
 
 - 빌드 명령: `python3 build.py`
-- 출력 폴더: `dist` (빌드하면 `dist/index.html` 한 파일이 생깁니다)
+- 출력 폴더: `dist` (게임 `dist/index.html` 과 소개·공략·도감·안내 페이지, robots.txt 등이 생깁니다)
 - 외부 패키지 설치는 필요 없습니다. `build.py` 는 파이썬 표준 라이브러리만 씁니다.
+  콘텐츠 페이지의 데이터·그림(`web/data.json`, `web/img/`)은 저장소에 커밋된 것을 읽으므로 빌드 환경에 브라우저나 Node가 없어도 됩니다.
 
 > Cloudflare 대시보드의 메뉴 이름은 가끔 바뀝니다. 아래 순서는 2026년 10월 기준 Cloudflare 공식 문서에 적힌 이름을 따랐습니다.
 > 화면 문구가 조금 다르면 비슷한 이름의 버튼을 고르면 됩니다.
@@ -122,10 +123,27 @@ GitHub 저장소를 한 번 연결해 두면 이후 `main` 에 push할 때마다
 
 ---
 
+## 사이트 설정 (site.json)
+
+저장소 최상위의 `site.json` 에 아래 값을 채웁니다. 비어 있으면 빌드는 되지만 경고가 나오고, 페이지에 눈에 띄는 자리표시자가 들어갑니다.
+
+| 키 | 넣을 값 | 비어 있으면 |
+|---|---|---|
+| `site_name` | 사이트 이름 (기본 `루멘 디센트`) | `[사이트 이름 입력 필요]` |
+| `domain` | 연결한 도메인, 예: `play.example.com` (`https://` 없이) | canonical·og:url 생략, `sitemap.xml` 만들지 않음 |
+| `contact_email` | 문의 받을 이메일 | 문의·개인정보처리방침에 `[연락처 이메일 입력 필요]` |
+| `updated_date` | 개인정보처리방침 개정일, 예: `2026-10-07` | `[개정일 입력 필요]` |
+| `adsense_publisher_id` | 애드센스 승인 후 받은 `pub-…` | `ads.txt` 를 만들지 않음 |
+
+배포 전에 `python3 build.py --release` 로 확인하면, 위 값(애드센스 ID 제외)이 비었거나 `web/data.json` 이 게임 원본보다 오래된 경우 실패합니다.
+Cloudflare의 빌드 명령은 그대로 `python3 build.py` 입니다(값이 비어도 배포는 됩니다).
+
+게임 데이터나 그림(엔진·카드·몬스터)을 바꿨다면 로컬에서 `python3 build.py --export` 로 `web/data.json`·`web/img/` 를 다시 만들어 함께 커밋하세요(Playwright 필요).
+
 ## 배포 전 로컬 확인
 
 ```bash
-python3 build.py              # lumen-descent.html, build/test.html, dist/index.html 생성
+python3 build.py              # lumen-descent.html, build/test.html, dist/(게임 + 콘텐츠 페이지) 생성
 python3 tools/webcheck.py     # dist/ 를 실제 HTTP 서버로 띄워 일반 웹 환경 점검(모바일 390×844)
 python3 tools/webcheck.py 1280 800 d   # 데스크톱
 ```
@@ -136,6 +154,7 @@ python3 tools/webcheck.py 1280 800 d   # 데스크톱
 - `localStorage` 가 막힌 브라우저(접근만 해도 예외)에서도 첫 화면 → 지도 → 전투까지 진행되는지
 - Google Fonts(`fonts.googleapis.com`, `fonts.gstatic.com`) 말고 바깥으로 나가는 요청이 없는지
 - 첫 화면·지도·전투 스크린샷: `build/shots/web-*.png`
+- 콘텐츠 페이지가 모두 200으로 열리는지, 내부 링크·그림이 깨지지 않는지, 가로 스크롤이 없는지, 제목 화면 안내 링크가 보이는지
 
 ## 일반 웹에서 달라지는 점
 

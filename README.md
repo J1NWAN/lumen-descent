@@ -17,9 +17,30 @@
 
 ## 실행
 ```bash
-python3 build.py          # → lumen-descent.html, dist/index.html (단일 파일, 외부 JS 의존성 없음)
+python3 build.py            # → lumen-descent.html, dist/ (게임 index.html + 콘텐츠 페이지)
+python3 build.py --release  # 배포 전 점검: site.json 이 비었거나 web/data.json 이 오래됐으면 실패
+python3 build.py --export   # 게임 데이터·그림을 web/ 로 다시 내보내기(Playwright 필요, 결과는 커밋)
 ```
-만든 `dist/index.html`(또는 `lumen-descent.html`)을 브라우저로 열면 됩니다.
+게임은 `dist/index.html`(또는 `lumen-descent.html`) 한 파일입니다. 콘텐츠 페이지는 `dist/` 를 HTTP로 띄워야 링크가 맞습니다
+(예: `python3 -m http.server -d dist`).
+
+## 웹 콘텐츠 페이지
+웹 배포본(`dist/`)에는 게임 말고도 크롤러가 읽을 수 있는 정적 페이지가 함께 만들어집니다.
+
+| 경로 | 내용 |
+|---|---|
+| `/about/` | 게임 소개(세계관·특징·영웅·층·플레이 방법) |
+| `/guide/` | 처음 하는 사람을 위한 공략 |
+| `/heroes/` · `/cards/` · `/bestiary/` · `/relics/` | 영웅·카드(103장)·몬스터(70종)·유품과 약병 도감 |
+| `/privacy/` · `/contact/` | 개인정보처리방침 · 문의 |
+| `/404.html` · `/robots.txt` · `/sitemap.xml` · `/ads.txt` | 안내 파일(사이트맵은 도메인, ads.txt 는 퍼블리셔 ID가 있을 때만) |
+
+- **설정 `site.json`**: `site_name`, `domain`, `contact_email`, `updated_date`(개인정보처리방침 개정일), `adsense_publisher_id`.
+  비어 있으면 빌드가 경고하고 페이지에 `[연락처 이메일 입력 필요]` 같은 자리표시자를 넣습니다. `--release` 에서는 실패합니다.
+- **데이터**: `web/data.json` 과 `web/img/`(카드·몬스터·영웅·유품 SVG)는 `--export` 로 게임에서 뽑아 **저장소에 커밋**합니다.
+  Cloudflare 빌드 환경에는 브라우저가 없어서, 일반 빌드는 커밋된 파일만 읽습니다. 게임 원본(엔진·그림)이 바뀌면 빌드가 「오래됐다」고 경고합니다.
+- **글**: 소개·공략·도감의 직접 쓴 글은 `web/content.py`, 페이지 틀은 `web/render.py`, 스타일은 `web/site.css` 에 있습니다.
+- 게임 제목 화면 아래의 `소개 · 공략 · 도감 · 개인정보처리방침` 링크는 웹 배포본에서만 보입니다(아티팩트에는 없음).
 
 ## 배포
 - **Cloudflare Pages**: GitHub 저장소를 연결해 두면 `main` 에 push할 때마다 자동 배포됩니다.
@@ -44,7 +65,10 @@ python3 build.py          # → lumen-descent.html, dist/index.html (단일 파�
 | `src/rigart.js` | 전투 밖 초상화에 새 그림을 연결합니다 |
 | `tools/riglab.py` | 리그 검수 도구 (정지 자세 모음, 동작 프레임) |
 | `tools/e2e.py` | 통합 테스트 (새 게임을 자동으로 진행) |
-| `tools/webcheck.py` | 웹 배포 점검 (dist/ 를 HTTP로 띄워 아티팩트 객체·저장소 차단·외부 요청 확인) |
+| `tools/webcheck.py` | 웹 배포 점검 (dist/ 를 HTTP로 띄워 아티팩트 객체·저장소 차단·외부 요청·콘텐츠 페이지·내부 링크 확인) |
+| `tools/export_web.py` | 웹 콘텐츠용 데이터·그림 내보내기 (`build.py --export` 가 부름) |
+| `web/` | 웹 콘텐츠 페이지: `render.py`(생성기), `content.py`(직접 쓴 글), `site.css`, `data.json`·`img/`(내보낸 데이터) |
+| `site.json` | 웹 사이트 설정 (도메인·연락처·개정일·애드센스 ID) |
 | `docs/DEPLOY.md` | Cloudflare Pages 배포 안내 |
 | `tools/MONSTER_GUIDE.md` | 몬스터 리그 작성 가이드 (화풍·API·검증 절차) |
 | `preview/` | 세라 2세대 아트 시안 페이지 |

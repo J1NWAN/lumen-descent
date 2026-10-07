@@ -7,6 +7,8 @@
   3) Google Fonts 말고 바깥 주소로 나가는 요청이 없는지
   4) 첫 화면·지도·전투 화면 스크린샷(build/shots/web-*.png)
   5) 첫 실행 안내(투어)가 지도·전투에서 뜨고, 건너뛰기(Esc)·다음(Enter)으로 닫히는지
+  6) 콘텐츠 페이지(소개·공략·도감·안내·404·robots 등)가 모두 200으로 열리고, 내부 링크·그림이 깨지지 않는지,
+     가로 스크롤이 없고 h1 이 하나인지, 제목 화면의 안내 링크가 웹 배포본에서 보이는지
 """
 import asyncio, sys, threading, functools, http.server, socketserver
 from pathlib import Path
@@ -34,6 +36,9 @@ window.claude = { use: async name => name === 'user' ? { isOwner: async () => tr
 def serve():
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *a): pass
+        def handle(self):   # 페이지를 넘길 때 끊긴 그림 요청은 무시합니다
+            try: super().handle()
+            except (BrokenPipeError, ConnectionResetError): pass
     handler = functools.partial(Quiet, directory=str(DIST))
     httpd = socketserver.TCPServer(('127.0.0.1', 0), handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -118,6 +123,41 @@ async def run_case(b, url, w, h, tag, block_ls, owner=False):
     return info, errs, sorted(ext), bad, netfail
 
 
+async def check_pages(b, url, w, h):
+    """콘텐츠 페이지 점검. 반환: (문제 목록, 요약)"""
+    pages = ['/' if f.name == 'index.html' and f.parent == DIST else
+             ('/' + str(f.relative_to(DIST)).replace('index.html', '')) for f in sorted(DIST.rglob('*.html'))]
+    pages += ['/' + n for n in ('robots.txt', 'sitemap.xml', 'ads.txt') if (DIST / n).exists()]
+    probs, refs, ext = [], set(), set()
+    ctx = await b.new_context(viewport={'width': w, 'height': h})
+    pg = await ctx.new_page()
+    errs = []
+    pg.on('pageerror', lambda e: errs.append(str(e)))
+    pg.on('request', lambda r: ext.add(urlparse(r.url).hostname) if urlparse(r.url).hostname not in ('127.0.0.1', None) else None)
+    for path in pages:
+        r = await pg.goto(url.rstrip('/') + path, wait_until='domcontentloaded')
+        if not r or r.status != 200:
+            probs.append(f'{path}: 응답 {r.status if r else "없음"}'); continue
+        if not path.endswith('.html') and not path.endswith('/'):
+            continue
+        await pg.wait_for_timeout(250 if path != '/' else 1500)
+        i = await pg.evaluate("""() => ({ ox: document.documentElement.scrollWidth - innerWidth, h1: document.querySelectorAll('h1').length,
+          refs: [...document.querySelectorAll('a[href], img[src], link[href]')].map(x => x.getAttribute('href') || x.getAttribute('src')),
+          links: (() => { const n = document.querySelector('.title-links'); return n ? (n.getClientRects().length ? 'visible' : 'hidden') : 'none'; })() })""")
+        if i['ox'] > 0: probs.append(f'{path}: 가로 스크롤 {i["ox"]}px')
+        if path != '/' and i['h1'] != 1: probs.append(f'{path}: h1 {i["h1"]}개')
+        if path == '/' and i['links'] != 'visible': probs.append(f'제목 화면 안내 링크: {i["links"]}')
+        refs.update(x.split('#')[0] for x in i['refs'] if x and x.startswith('/') and not x.startswith('//'))
+    for ref in sorted(refs - {''}):
+        r = await ctx.request.get(url.rstrip('/') + ref)
+        if r.status != 200: probs.append(f'깨진 내부 링크·그림: {ref} ({r.status})')
+    extra = [x for x in ext if x not in ALLOWED]
+    if extra: probs.append(f'허용 밖 외부 요청: {extra}')
+    if errs: probs.append(f'오류: {errs[:3]}')
+    await ctx.close()
+    return probs, f'페이지 {len(pages)}개 · 내부 링크·그림 {len(refs)}개'
+
+
 async def main():
     w = int(sys.argv[1]) if len(sys.argv) > 1 else 390
     h = int(sys.argv[2]) if len(sys.argv) > 2 else 844
@@ -144,6 +184,10 @@ async def main():
             if errs or extra or bad or gamefail or info['claude'] != 'undefined' or info['lab'] != 'hidden' or not info['combat'] \
                     or any('STUCK' in v or 'missing' in v for v in info['tour'].values()):
                 ok = False
+        probs, summary = await check_pages(b, url, w, h)
+        print(f'[콘텐츠 페이지] {w}x{h}', summary)
+        print('  문제:', probs or '없음')
+        if probs: ok = False
         own = await run_case(b, url, w, h, tag, False, owner=True)
         print('[비교: 소유자 흉내] 연구소 버튼:', own['lab'], '(visible 이어야 정상)')
         if own['lab'] != 'visible': ok = False

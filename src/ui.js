@@ -407,6 +407,7 @@ function showTitle() {
       <button class="btn ghost" id="t-help">하는 법</button>
       <button class="btn ghost lab-entry" id="t-lab" ${window.__lumenAdmin ? '' : 'hidden'}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M7.5 15h9" stroke="currentColor" stroke-width="2"/></svg>밸런스 연구소</button>
     </div>
+    <nav class="title-links" aria-label="게임 안내" ${window.__lumenWeb ? '' : 'hidden'}>${[['/about/', '소개'], ['/guide/', '공략'], ['/cards/', '도감'], ['/privacy/', '개인정보처리방침']].map(([h, t]) => `<a href="${h}" target="_blank" rel="noopener">${t}</a>`).join('<span aria-hidden="true">·</span>')}</nav>
   </div>`);
   if (sv) $('#t-cont').onclick = () => { g = sv; sfx('turn'); resume(); };
   $('#t-new').onclick = () => { sfx('card'); showSelect(); };

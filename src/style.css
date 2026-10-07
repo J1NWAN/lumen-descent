@@ -878,3 +878,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; 
 .tour-off { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #cfc6b5; cursor: pointer; }
 .tour-off input { accent-color: var(--amber); width: 16px; height: 16px; margin: 0; }
 @media (prefers-reduced-motion: reduce) { .tour-hole { animation: none; transition: none; } .tour-pop { transition: none; } .tour-pop.in > * { animation: none; } }
+
+/* 제목 화면 아래 안내 링크(웹 배포본에서만 보입니다. 새 탭으로 열려 진행을 잃지 않습니다) */
+.title-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 10px; font-size: 13px; }
+.title-links a { color: var(--mute); text-decoration: none; padding: 4px 2px; }
+.title-links a:hover, .title-links a:focus-visible { color: var(--amber); text-decoration: underline; text-underline-offset: 3px; }
+.title-links span { color: #4a5a63; }
