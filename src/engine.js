@@ -931,7 +931,7 @@ function addTonic(g, id) { const i = g.tonics.indexOf(null); if (i < 0) return f
 
 function healG(g, n) { g.hp = Math.min(g.maxHp, g.hp + n); }
 function loseHpG(g, n) { g.hp = Math.max(0, g.hp - n); }
-function priceMult(g) { return (hasKs(g, 'rustyScale') ? 0.8 : 1) * (hasKs(g, 'hungryLamp') ? 1.5 : 1); }
+function priceMult(g) { return (hasKs(g, 'rustyScale') ? 0.8 : 1) * (hasKs(g, 'hungryLamp') ? 1.5 : 1) * ((g.mods && g.mods.price) || 1); }
 
 /* =====================================================================
    맵 생성 — 12줄 × 7칸, 위에서 아래로 내려가는 구조
@@ -961,7 +961,7 @@ function genMap(g) {
       c = nxt;
     }
   }
-  const W = { m: 45, e: 22, E: 9, R: 12, S: 6 };
+  const W = { m: 45, e: 22, E: (g.mods && g.mods.eliteW) || 9, R: 12, S: 6 };
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const n = grid[r][c]; if (!n) continue;
@@ -998,19 +998,46 @@ function nextOptions(g) {
 }
 
 /* =====================================================================
+   난이도 단계 (승천 방식) — 단계 N은 1..N의 규칙을 모두 겹쳐 받습니다.
+   m(mods): 숫자만 넣습니다(g.mods 는 JSON으로 저장됩니다).
+   ===================================================================== */
+const ASC = [
+  null,
+  { n: '짙은 그림자', tx: '정예 방이 더 자주 나타나고, 층마다 처음 만나는 약한 적 무리가 3번에서 1번으로 줄어듭니다.', m: m => { m.eliteW = 20; m.easy = 1; } },
+  { n: '날 선 발톱', tx: '모든 적의 피해가 10% 늘어납니다.', m: m => { m.edmg *= 1.1; } },
+  { n: '굶주린 상인', tx: '상점 가격이 20% 오르고, 전투에서 얻는 파편이 20% 줄어듭니다.', m: m => { m.price = 1.2; m.shard = 0.8; } },
+  { n: '정예의 위엄', tx: '정예는 체력이 10% 더 많고, 전투 시작 시 기세 2를 얻습니다.', m: m => { m.eliteHp = 1.1; m.eliteMight = 2; } },
+  { n: '닳은 등불', tx: '최대 체력이 10% 줄어들고, 쉼터 휴식 회복량이 30%에서 25%로 줄어듭니다.', m: m => { m.hp = 0.9; m.rest = 0.25; } },
+  { n: '오래된 상처', tx: '시작 덱에 저주 「상처」가 1장 들어 있습니다. 턴이 끝날 때 손에 있으면 체력 2를 잃습니다.', m: m => { m.curse = 1; } },
+  { n: '깨어난 주인', tx: '층의 주인의 체력이 10% 늘어납니다.', m: m => { m.bossHp = 1.1; } },
+];
+const ASC_MAX = ASC.length - 1;
+/* 단계 → 규칙 배율(누적). 연구소의 ehp/edmg 같은 바깥 배율은 그 위에 곱합니다. */
+function ascMods(lv, mods) {
+  const m = { ehp: 1, edmg: 1 };
+  for (let i = 1; i <= Math.min(lv | 0, ASC_MAX); i++) ASC[i].m(m);
+  if (mods) for (const k in mods) m[k] = (k === 'ehp' || k === 'edmg') ? m[k] * mods[k] : mods[k];
+  return m;
+}
+
+/* =====================================================================
    런 (한 번의 여정)
    ===================================================================== */
-function newRun(chId, seed, mods) {
+function newRun(chId, seed, mods, asc) {
   const ch = CHARS[chId];
   seed = (seed >>> 0) || 1;
+  asc = Math.max(0, Math.min(ASC_MAX, asc | 0));
+  const M = ascMods(asc, mods);
+  const hp0 = Math.round(ch.hp * (M.hp || 1));
   const g = {
-    v: 1, seed, rs: seed, ch: chId, hp: ch.hp, maxHp: ch.hp, shards: 99,
+    v: 1, seed, rs: seed, ch: chId, hp: hp0, maxHp: hp0, shards: 99, asc,
     deck: [], ks: [], tonics: [null, null, null], stratum: 1, map: null, pos: null, path: [],
     floor: 0, removeCost: 75, rareBonus: 0, tonicChance: 40, easyLeft: 3, lastEnc: null,
     seenEv: [], uidc: 1, bossId: null, bossDone: false, phase: 'map', shop: null, rewards: null,
-    stats: { kills: 0, elites: 0, bosses: 0, dmgTaken: 0, cards: 0, floors: 0 }, over: null, mods: Object.assign({ ehp: 1, edmg: 1 }, mods || {}),
+    stats: { kills: 0, elites: 0, bosses: 0, dmgTaken: 0, cards: 0, floors: 0 }, over: null, mods: M,
   };
   ch.deck.forEach(id => addDeck(g, id));
+  for (let i = 0; i < (M.curse || 0); i++) addDeck(g, 'scar');
   gainKs(g, ch.ks);
   startStratum(g, 1);
   g.phase = 'intro';
@@ -1018,7 +1045,7 @@ function newRun(chId, seed, mods) {
 }
 function startStratum(g, s) {
   if (s > 1) g.hp = Math.min(g.maxHp, g.hp + Math.round((g.maxHp - g.hp) * 0.75));
-  g.stratum = s; g.map = genMap(g); g.pos = null; g.path = []; g.easyLeft = 3; g.bossDone = false;
+  g.stratum = s; g.map = genMap(g); g.pos = null; g.path = []; g.easyLeft = (g.mods && g.mods.easy) != null ? g.mods.easy : 3; g.bossDone = false;
   g.bossId = pick(g, STRATA[s].bosses);
   g.phase = 'stratumIntro';
 }
@@ -1054,7 +1081,7 @@ function pickEvent(g) {
 /* 보상 */
 function makeRewards(g, kind, extra) {
   const R = [];
-  const mult = hasKs(g, 'silverBell') ? 1.25 : 1;
+  const mult = (hasKs(g, 'silverBell') ? 1.25 : 1) * (kind !== 'treasure' && g.mods && g.mods.shard || 1);
   const sh = kind === 'boss' ? ri(g, 90, 110) : kind === 'elite' ? ri(g, 25, 35) : kind === 'treasure' ? ri(g, 15, 30) : ri(g, 10, 20);
   R.push({ k: 'shards', n: Math.round((sh + (extra && extra.bonusShards || 0)) * mult) });
   if (kind === 'elite' || kind === 'treasure' || (extra && extra.bonusKs)) { const k = rollKs(g); if (k) R.push({ k: 'ks', id: k }); }
@@ -1131,7 +1158,7 @@ function buyRemove(g, uid) {
 }
 function upgradeCard(g, uid) { const c = g.deck.find(c => c.uid === uid); if (!c || !canUp(c)) return false; c.up = 1; return true; }
 function dupCard(g, uid) { const c = g.deck.find(c => c.uid === uid); if (!c) return false; addDeck(g, c.id, c.up); return true; }
-function restHeal(g) { const n = Math.floor(g.maxHp * 0.3) + (hasKs(g, 'lampOil') ? 15 : 0); const before = g.hp; healG(g, n); return g.hp - before; }
+function restHeal(g) { const n = Math.floor(g.maxHp * ((g.mods && g.mods.rest) || 0.3)) + (hasKs(g, 'lampOil') ? 15 : 0); const before = g.hp; healG(g, n); return g.hp - before; }
 
 /* =====================================================================
    전투
@@ -1159,11 +1186,15 @@ function startCombat(g, ids, kind, extra) {
 function spawn(C, id, minion, atEnd) {
   const d = ENEMIES[id], g = C.g;
   const S = STRATA[g.stratum] || {}, mods = g.mods || {};
-  const hp = Math.round((Array.isArray(d.hp) ? ri(g, d.hp[0], d.hp[1]) : d.hp) * (S.hp || 1) * (mods.ehp || 1));
-  const e = { uid: 'e' + (C.euid++), id, n: d.n, hp, maxHp: hp, guard: 0, st: {}, alive: true, hist: [], data: {}, intent: null, dm: (S.dmg || 1) * (mods.edmg || 1) };
+  /* 난이도 단계: 정예·주인 본체(소환된 하수인 제외)에만 붙는 배율 */
+  const kh = minion ? 1 : C.kind === 'elite' ? (mods.eliteHp || 1) : C.kind === 'boss' ? (mods.bossHp || 1) : 1;
+  const kd = !minion && C.kind === 'boss' ? (mods.bossDmg || 1) : 1;
+  const hp = Math.round((Array.isArray(d.hp) ? ri(g, d.hp[0], d.hp[1]) : d.hp) * (S.hp || 1) * (mods.ehp || 1) * kh);
+  const e = { uid: 'e' + (C.euid++), id, n: d.n, hp, maxHp: hp, guard: 0, st: {}, alive: true, hist: [], data: {}, intent: null, dm: (S.dmg || 1) * (mods.edmg || 1) * kd };
   if (minion) e.st.minion = 1;
   if (atEnd) C.en.push(e); else C.en.unshift(e);
   if (d.init) d.init(C, e);
+  if (!minion && C.kind === 'elite' && mods.eliteMight) e.st.might = (e.st.might || 0) + mods.eliteMight;
   rollIntent(C, e);
   if (!atEnd) ev(C, { k: 'spawn', to: e.uid });
   return e;
@@ -1659,7 +1690,7 @@ const BOSS_PREF = ['abyssEye', 'emberHeart', 'crystalCrown', 'clockHeart', 'sunN
 function* botRunGen(ch, seed, cfg) {
   cfg = cfg || {};
   const P = BOT_PROFILES[cfg.profile || 'std'];
-  const g = newRun(ch, seed, cfg.mods);
+  const g = newRun(ch, seed, cfg.mods, cfg.asc);
   g.phase = 'map';
   const out = { ch, seed, win: false, stratum: 1, floor: 0, fights: [], picks: [], offers: [], killer: null, killerKind: null, ksFirst: {}, bossHp: {}, turns: 0 };
   let logs = [];
@@ -1737,6 +1768,7 @@ const API = {
   healG, loseHpG, genMap, mapNode, nextOptions, newRun, startStratum, pickEncounter, enterNode, pickEvent,
   makeRewards, claimReward, bossKsOptions, genShop, buy, buyRemove, removeCard, upgradeCard, dupCard, restHeal,
   startCombat, intentInfo, calc, bonus, canPlay, cardCost, playCard, useTonic, endTurnGen, endCombat, resolvePending,
+  ASC, ASC_MAX, ascMods,
   alive, high, low, score, priceMult, tonicPool, combo, LAST_STRATUM, BOT_PROFILES, botRunGen, simRun, botPlayTurn, botFightGen, botTonics, cloneC, spawn,
 };
 root.LD = API;

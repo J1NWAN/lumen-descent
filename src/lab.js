@@ -39,7 +39,7 @@ detectAdmin();
 /* ---------------- 상태 ---------------- */
 const S = {
   tab: 'sim',
-  cfg: { chars: CH.slice(), n: 50, profile: 'std', ehp: 1, edmg: 1, seed: 1 },
+  cfg: { chars: CH.slice(), n: 50, profile: 'std', asc: 0, ehp: 1, edmg: 1, seed: 1 },
   sim: null,
   cardSort: { k: 'picks', d: -1 }, cardCh: 'all', cardMore: false,
   spec: null,
@@ -89,6 +89,7 @@ function renderSim() {
         <div class="lab-chars">${CH.map(ch => `<button class="lab-char ${c.chars.includes(ch) ? 'on' : ''}" data-ch="${ch}" style="--c:${COL[ch]};--t:${TXT[ch]}" aria-pressed="${c.chars.includes(ch)}"><span class="lc-port">${ui.heroArt(ch)}</span><b>${esc(L.CHARS[ch].n)}</b></button>`).join('')}</div></div>
       <div class="fld"><div class="lbl">캐릭터당 판 수</div>${seg('n', [[20, '20'], [50, '50'], [100, '100'], [200, '200']], c.n)}</div>
       <div class="fld"><div class="lbl">봇 성향</div>${seg('profile', Object.keys(L.BOT_PROFILES).map(k => [k, L.BOT_PROFILES[k].n]), c.profile)}<small class="hint-tx" id="prof-tx">${esc(PROF_TX[c.profile])}</small></div>
+      <div class="fld"><div class="lbl">난이도 단계</div>${seg('asc', Array.from({ length: L.ASC_MAX + 1 }, (_, i) => [i, String(i)]), c.asc)}<small class="hint-tx">단계 규칙을 먼저 적용하고, 아래 적 배율을 그 위에 곱합니다.</small></div>
       <div class="fld"><label class="lbl" for="lab-ehp">적 체력 배율 <output id="o-ehp">×${c.ehp.toFixed(2)}</output></label><input type="range" id="lab-ehp" min="0.5" max="1.5" step="0.05" value="${c.ehp}"></div>
       <div class="fld"><label class="lbl" for="lab-edmg">적 피해 배율 <output id="o-edmg">×${c.edmg.toFixed(2)}</output></label><input type="range" id="lab-edmg" min="0.5" max="1.5" step="0.05" value="${c.edmg}"></div>
       <div class="fld"><label class="lbl" for="lab-seed">시작 시드</label><input type="number" id="lab-seed" min="1" max="999999" value="${c.seed}" inputmode="numeric"><small class="hint-tx">같은 시드·조건이면 결과가 똑같이 나옵니다.</small></div>
@@ -105,7 +106,7 @@ function renderSim() {
     $$('.lab-char', b).forEach(x => { const on = c.chars.includes(x.dataset.ch); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); });
   });
   $$('.lab-seg', b).forEach(sg => $$('button', sg).forEach(bt => bt.onclick = () => {
-    const k = sg.dataset.k; c[k] = k === 'n' ? +bt.dataset.v : bt.dataset.v;
+    const k = sg.dataset.k; c[k] = k === 'n' || k === 'asc' ? +bt.dataset.v : bt.dataset.v;
     $$('button', sg).forEach(x => { x.classList.toggle('on', x === bt); x.setAttribute('aria-checked', x === bt); });
     if (k === 'profile') $('#prof-tx').textContent = PROF_TX[c.profile];
   }));
@@ -152,7 +153,7 @@ function startSim() {
   const c = S.cfg;
   const jobs = [];
   for (let i = 0; i < c.n; i++) for (const ch of c.chars) jobs.push({ ch, seed: (c.seed * 100003 + i * 7919 + CH.indexOf(ch) * 31) >>> 0 });
-  const cfg = { profile: c.profile, mods: { ehp: c.ehp, edmg: c.edmg } };
+  const cfg = { profile: c.profile, asc: c.asc | 0, mods: { ehp: c.ehp, edmg: c.edmg } };
   const sim = S.sim = { cfg: JSON.parse(JSON.stringify(c)), jobs, next: 0, total: jobs.length, results: [], running: true, t0: performance.now(), workers: [], mode: 'worker', lastPaint: 0 };
   const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
   const feed = w => {
@@ -291,7 +292,7 @@ function renderResults() {
   const scroll = el.scrollTop;
   el.innerHTML = `
     <div class="lab-legend">${chars.map(ch => `<span><i style="background:${COL[ch]}"></i>${esc(L.CHARS[ch].n)}</span>`).join('')}
-      <span class="lab-meta">봇 ${esc(L.BOT_PROFILES[sim.cfg.profile].n)} · 적 체력 ×${sim.cfg.ehp.toFixed(2)} · 적 피해 ×${sim.cfg.edmg.toFixed(2)} · 시드 ${sim.cfg.seed}</span>
+      <span class="lab-meta">봇 ${esc(L.BOT_PROFILES[sim.cfg.profile].n)}${sim.cfg.asc ? ` · 단계 ${sim.cfg.asc}` : ''} · 적 체력 ×${sim.cfg.ehp.toFixed(2)} · 적 피해 ×${sim.cfg.edmg.toFixed(2)} · 시드 ${sim.cfg.seed}</span>
       <button class="btn ghost small" id="lab-copy">결과 복사(JSON)</button></div>
     <div class="lab-kpis">${chars.map(ch => kpiTile(ch, a.kpi[ch])).join('')}</div>
     <div class="lab-card"><div class="lc-h"><h3>층별 생존 곡선</h3><small>가로축은 층 · 각 층에 도달한 판의 비율 · 마지막 점은 최종 승리</small></div>${survChart(a, chars)}</div>

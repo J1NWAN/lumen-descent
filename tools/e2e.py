@@ -1,5 +1,6 @@
 """통합 테스트: 새 게임을 시작해 방 N개를 자동으로 진행합니다.
   python3 build.py && python3 tools/e2e.py sera 1280 800 run1 6
+  난이도 단계로 시작: 맨 끝에 단계 번호(예: ... run1 6 5). 그 단계까지 열린 기록을 미리 넣고 고릅니다.
 스크린샷은 build/shots/ 에 저장됩니다."""
 import asyncio, sys
 from playwright.async_api import async_playwright
@@ -41,15 +42,20 @@ async def combat(pg):
             if await pg.query_selector('#end-turn:not([disabled])') or await pg.query_selector('.overlay') or await pg.query_selector('.over-screen'): break
         await pg.wait_for_timeout(300)
 
-async def main(ch, w, h, tag, rooms):
+async def main(ch, w, h, tag, rooms, asc=0):
     async with async_playwright() as p:
         b = await p.chromium.launch()
         pg = await b.new_page(viewport={'width': w, 'height': h})
         errs = []
         pg.on('pageerror', lambda e: errs.append('pageerror: ' + str(e)))
         await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
+        if asc:
+            await pg.add_init_script("localStorage.setItem('lumen-descent-meta-v1', JSON.stringify({open: {%s: %d}}))" % (ch, asc))
         await pg.goto(URL)
-        await pg.click('#t-new'); await pg.click(f'.char-card[data-ch="{ch}"]'); await pg.click('#s-go')
+        await pg.click('#t-new'); await pg.click(f'.char-card[data-ch="{ch}"]')
+        if asc: await pg.click(f'.asc-chip[data-asc="{asc}"]')
+        await pg.wait_for_timeout(200); await pg.screenshot(path=OUT + f'{tag}-select.png', full_page=True)
+        await pg.click('#s-go')
         await pg.wait_for_timeout(200); await pg.click('#st-go'); await pg.wait_for_timeout(300)
         shots = set(); log = []
         for n in range(rooms):
@@ -130,4 +136,5 @@ async def main(ch, w, h, tag, rooms):
         await b.close()
 
 ch = sys.argv[1]; w = int(sys.argv[2]); h = int(sys.argv[3]); tag = sys.argv[4]; rooms = int(sys.argv[5])
-asyncio.run(main(ch, w, h, tag, rooms))
+asc = int(sys.argv[6]) if len(sys.argv) > 6 else 0
+asyncio.run(main(ch, w, h, tag, rooms, asc))

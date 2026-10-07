@@ -12,6 +12,7 @@ const RAR = { s: '기본', c: '일반', u: '고급', r: '희귀', x: '' };
 const KSR = { s: '시작 유품', c: '일반 유품', u: '고급 유품', r: '희귀 유품', b: '심층 유품' };
 const SAVE_KEY = 'lumen-descent-save-v1';
 const PREF_KEY = 'lumen-descent-pref-v1';
+const META_KEY = 'lumen-descent-meta-v1';
 
 let g = null;        // 여정 상태
 let C = null;        // 전투 상태
@@ -25,10 +26,36 @@ let pref = { sound: true };
 const stage = () => $('#stage');
 function tryLS(fn, fb) { try { return fn(); } catch (e) { return fb; } }
 function save() { if (g && !g.over) tryLS(() => localStorage.setItem(SAVE_KEY, JSON.stringify(g))); }
-function loadSave() { return tryLS(() => { const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; }, null); }
+function loadSave() {
+  const sv = tryLS(() => { const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; }, null);
+  if (sv && sv.asc == null) sv.asc = 0;   // 난이도 단계가 없던 옛 저장
+  return sv;
+}
 function clearSave() { tryLS(() => localStorage.removeItem(SAVE_KEY)); }
 pref = Object.assign(pref, tryLS(() => JSON.parse(localStorage.getItem(PREF_KEY) || '{}'), {}));
 function savePref() { tryLS(() => localStorage.setItem(PREF_KEY, JSON.stringify(pref))); }
+/* 영구 기록: 영웅별로 열린 난이도 단계(open), 마지막으로 고른 단계(pick), 클리어한 최고 단계(best).
+   저장소가 막혀 있으면 빈 기록(모두 단계 0)으로 시작하고, 이번 방문 동안만 메모리에 남습니다. */
+let meta = (() => {
+  const m = tryLS(() => JSON.parse(localStorage.getItem(META_KEY) || 'null'), null);
+  const ok = m && typeof m === 'object';
+  const obj = k => (ok && m[k] && typeof m[k] === 'object') ? m[k] : {};
+  return { v: 1, open: obj('open'), pick: obj('pick'), best: obj('best') };
+})();
+function saveMeta() { return tryLS(() => { localStorage.setItem(META_KEY, JSON.stringify(meta)); return true; }, false); }
+/* 받침에 맞는 조사: jo('린', '으로') → '린으로', jo(2, '을', '를') → '2를' */
+function jo(w, a, b) {
+  const t = String(w), c = t.charCodeAt(t.length - 1);
+  let fin = 0;   // 0 받침 없음, 1 받침, 8 ㄹ 받침
+  if (c >= 0xac00 && c <= 0xd7a3) { const f = (c - 0xac00) % 28; fin = f === 0 ? 0 : f === 8 ? 8 : 1; }
+  else if (/[0-9]$/.test(t)) fin = [1, 8, 0, 1, 0, 0, 1, 8, 8, 0][+t.slice(-1)];
+  return t + (a === '으로' ? (fin === 1 ? '으로' : '로') : (fin ? a : b));
+}
+const clampAsc = n => Math.max(0, Math.min(L.ASC_MAX, n | 0));
+function ascOpen(ch) { return clampAsc(meta.open[ch]); }
+function ascTip(lv) {
+  return `<b>난이도 단계 ${lv}</b><br>` + L.ASC.slice(1, lv + 1).map((a, i) => `${i + 1}. ${esc(a.n)}`).join('<br>');
+}
 
 /* ---------------- 소리 (Web Audio로 합성) ---------------- */
 let actx = null;
@@ -217,7 +244,7 @@ function renderHUD() {
       ? `<button class="tonic-slot full" data-tonic="${i}" data-tip="${esc(tonicTip(t))}" aria-label="${esc(L.TONICS[t].n)}">${A.tonicIcon(t)}</button>`
       : `<button class="tonic-slot" disabled aria-label="빈 약병 칸"></button>`).join('')}</div>
     <div class="hud-ks${g.ks.length > 12 ? ' many' : ''}">${g.ks.map(id => `<button class="ks-chip" data-ks="${id}" data-tip="${esc(ksTip(id))}" aria-label="${esc(L.KS[id].n)}">${A.ksIcon(id, L.KS[id].r)}</button>`).join('')}</div>
-    <div class="hud-floor"><b>${L.STRATA[g.stratum].n}</b> · 깊이 <span class="num">${g.floor}</span></div>
+    <div class="hud-floor"><b>${L.STRATA[g.stratum].n}</b> · 깊이 <span class="num">${g.floor}</span>${g.asc ? `<span class="hud-asc" data-tip="${esc(ascTip(g.asc))}">단계 <span class="num">${g.asc}</span></span>` : ''}</div>
     <div class="hud-btns">
       <button class="icon-btn" id="hud-deck" data-tip="덱 보기">${IC.deck}<span class="num">${g.deck.length}</span></button>
       ${C || g.phase !== 'map' ? `<button class="icon-btn" id="hud-map" data-tip="지도 보기">${IC.map}</button>` : ''}
@@ -317,6 +344,7 @@ function chooseCards(opt) {
 function showMenu() {
   const o = overlay(`<div class="panel"><h2>잠시 멈춤</h2>
     <div class="sub">여정은 지도 화면에 설 때마다 이 브라우저에 저장됩니다.</div>
+    ${g.asc ? `<div class="asc-mini"><div class="asc-mini-h">난이도 단계 <b>${g.asc}</b></div>${L.ASC.slice(1, g.asc + 1).map((a, i) => `<div><span>${i + 1}</span><b>${esc(a.n)}</b> ${esc(a.tx)}</div>`).join('')}</div>` : ''}
     <div class="opts">
       <button class="opt" data-a="resume"><b>계속하기</b></button>
       <button class="opt" data-a="title"><b>처음 화면으로</b><small>마지막으로 지도에 섰던 곳부터 이어 할 수 있습니다.</small></button>
@@ -408,13 +436,52 @@ function showSelect() {
           <p>${esc(ch.blurb)}</p><p>${fmtKw(ch.mech)}</p>
           <div class="char-meta"><span>체력 <b>${ch.hp}</b></span><span data-tip="${esc(ksTip(ch.ks))}">시작 유품 <b>${esc(L.KS[ch.ks].n)}</b></span></div></div>
       </button>`).join('')}</div>
+    <section class="asc-panel" aria-label="난이도 단계">
+      <div class="asc-top">
+        <div class="asc-title">난이도 단계 <small id="asc-open"></small></div>
+        <div class="asc-row">
+          <button class="asc-step" id="asc-minus" aria-label="단계 낮추기">−</button>
+          <div class="asc-chips" role="radiogroup">${Array.from({ length: L.ASC_MAX + 1 }, (_, i) => `<button class="asc-chip" data-asc="${i}" role="radio">${i}</button>`).join('')}</div>
+          <button class="asc-step" id="asc-plus" aria-label="단계 올리기">+</button>
+        </div>
+      </div>
+      <div class="asc-body" id="asc-body"></div>
+    </section>
     <div class="select-actions"><button class="btn ghost" id="s-back">뒤로</button><button class="btn primary" id="s-go">하강 시작</button></div>
   </div>`);
-  $$('.char-card', el).forEach(b => b.onclick = () => { pickCh = b.dataset.ch; $$('.char-card', el).forEach(x => x.classList.toggle('sel', x === b)); sfx('card'); });
+  let asc = 0;
+  const LOCK = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  function paintAsc() {
+    const open = ascOpen(pickCh), ch = L.CHARS[pickCh], locked = asc > open;
+    $('#asc-open').textContent = `${ch.n} · 단계 ${open}까지 열림`;
+    $$('.asc-chip', el).forEach(b => {
+      const i = +b.dataset.asc;
+      b.classList.toggle('sel', i === asc); b.classList.toggle('locked', i > open);
+      b.setAttribute('aria-checked', i === asc ? 'true' : 'false');
+      b.innerHTML = i > open ? `${LOCK}<span>${i}</span>` : `<span>${i}</span>`;
+      b.dataset.tip = i > open ? `<b>단계 ${i} · 잠김</b><br>${esc(jo(ch.n, '으로'))} 단계 ${jo(i - 1, '을', '를')} 클리어하면 열립니다.` : `<b>단계 ${i}</b>${i ? '<br>' + esc(L.ASC[i].n) : '<br>기본 난이도'}`;
+    });
+    $('#asc-minus').disabled = asc <= 0; $('#asc-plus').disabled = asc >= L.ASC_MAX;
+    const rules = L.ASC.slice(1, asc + 1);
+    $('#asc-body').classList.toggle('locked', locked);
+    $('#asc-body').innerHTML = (locked ? `<div class="asc-lock">${LOCK}<span><b>잠긴 단계입니다.</b> ${esc(jo(ch.n, '으로'))} 단계 ${jo(asc - 1, '을', '를')} 클리어하면 열립니다. 단계는 영웅마다 따로 엽니다.</span></div>` : '')
+      + (asc === 0 ? `<p class="asc-zero">기본 난이도입니다. 이 단계를 클리어하면 다음 단계가 열리고, 단계가 오를 때마다 아래 규칙이 하나씩 쌓입니다.</p>`
+        : `<ol class="asc-list">${rules.map((a, i) => `<li class="${i + 1 === asc ? 'new' : ''}"><span class="asc-n">${i + 1}</span><div><b>${esc(a.n)}</b><p>${esc(a.tx)}</p></div></li>`).join('')}</ol>`);
+    const go = $('#s-go'); go.disabled = locked; go.textContent = locked ? '잠긴 단계' : asc ? `단계 ${jo(asc, '으로')} 하강` : '하강 시작';
+  }
+  const setAsc = (n, snd) => { asc = clampAsc(n); if (asc <= ascOpen(pickCh)) meta.pick[pickCh] = asc; paintAsc(); if (snd) sfx('card'); };
+  const pickHero = id => { pickCh = id; asc = Math.min(clampAsc(meta.pick[id] != null ? meta.pick[id] : ascOpen(id)), ascOpen(id)); paintAsc(); };
+  $$('.char-card', el).forEach(b => b.onclick = () => { $$('.char-card', el).forEach(x => x.classList.toggle('sel', x === b)); pickHero(b.dataset.ch); sfx('card'); });
+  $$('.asc-chip', el).forEach(b => b.onclick = () => setAsc(+b.dataset.asc, true));
+  $('#asc-minus').onclick = () => setAsc(asc - 1, true);
+  $('#asc-plus').onclick = () => setAsc(asc + 1, true);
+  pickHero(pickCh);
   $('#s-back').onclick = showTitle;
   $('#s-go').onclick = () => {
+    if (asc > ascOpen(pickCh)) return;
+    saveMeta();
     const seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
-    g = L.newRun(pickCh, seed); sfx('turn');
+    g = L.newRun(pickCh, seed, null, asc); sfx('turn');
     showStratumIntro();
   };
 }
@@ -1112,10 +1179,24 @@ function showOver() {
   const win = g.over === 'win';
   const ch = L.CHARS[g.ch];
   if (win) sfx('win');
+  /* 난이도 단계 해금: 열린 최고 단계를 클리어하면 다음 단계가 열립니다(영웅별) */
+  const lv = g.asc | 0;
+  let unlock = '';
+  if (win) {
+    meta.best[g.ch] = Math.max(meta.best[g.ch] | 0, lv);
+    if (lv < L.ASC_MAX && ascOpen(g.ch) <= lv) {
+      meta.open[g.ch] = lv + 1; meta.pick[g.ch] = lv + 1;
+      const stored = saveMeta();
+      unlock = `<div class="asc-unlock"><b>단계 ${jo(lv + 1, '이', '가')} 열렸습니다</b><span>${esc(L.ASC[lv + 1].n)} — ${esc(L.ASC[lv + 1].tx)}</span>${stored ? '' : '<small>이 브라우저에 기록을 저장할 수 없어, 페이지를 닫으면 다시 잠깁니다.</small>'}</div>`;
+    } else {
+      saveMeta();
+      if (lv >= L.ASC_MAX) unlock = `<div class="asc-unlock top"><b>최고 단계를 정복했습니다</b><span>${esc(jo(ch.n, '으로'))} 단계 ${jo(lv, '을', '를')} 클리어했습니다.</span></div>`;
+    }
+  }
   $('#hud').hidden = true; SF.setScene(win ? 'sun' : 'well', false);
   const el = setScreen('over-screen', `<div class="over-card ${win ? 'win' : 'dead'}">
     ${win ? LAMP : ''}
-    <div class="eyebrow" style="color:var(--amber);letter-spacing:.35em;font-size:12px">${esc(ch.title)} ${esc(ch.n)}</div>
+    <div class="eyebrow" style="color:var(--amber);letter-spacing:.35em;font-size:12px">${esc(ch.title)} ${esc(ch.n)}${lv ? ` · 단계 ${lv}` : ''}</div>
     <h2>${win ? '백 년 만의 새벽' : '등불이 꺼졌다'}</h2>
     <p class="story" style="margin:0">${esc(win ? L.STORY.ending : L.STORY.death)}</p>
     ${win ? '' : `<p style="color:var(--mute);margin:0">${esc(L.STRATA[g.stratum].n)}, 깊이 ${g.floor}에서</p>`}
@@ -1127,6 +1208,7 @@ function showOver() {
       <div><b>${g.ks.length}</b><span>유품</span></div>
       <div><b>${L.score(g)}</b><span>점수</span></div>
     </div>
+    ${unlock}
     <div class="title-actions"><button class="btn ghost" id="ov-deck">마지막 덱 보기</button><button class="btn primary" id="ov-again">다시 내려가기</button></div>
   </div>`);
   const last = g;
@@ -1141,7 +1223,7 @@ function showOver() {
 window.__lumen = {
   fight(ch, ids, stratum) { g = L.newRun(ch, 12345); if (stratum) L.startStratum(g, stratum); g.phase = 'map'; startFight(ids, 'normal'); },
   state: () => ({ g, C }),
-  run(ch, stratum) { g = L.newRun(ch, 12345); if (stratum) L.startStratum(g, stratum); g.phase = 'map'; renderHUD(); },
+  run(ch, stratum, asc) { g = L.newRun(ch, 12345, null, asc); if (stratum) L.startStratum(g, stratum); g.phase = 'map'; renderHUD(); },
   show(name, ...a) { ({ rest: showRest, shop: showShop, map: showMap, intro: showStratumIntro, event: showEvent, title: showTitle, over: showOver, peek: showMapPeek })[name](...a); },
   view: () => viewCards('덱', g.deck.slice().sort(sortCards)),
 };
