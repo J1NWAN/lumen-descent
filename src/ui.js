@@ -407,7 +407,6 @@ function showTitle() {
       <button class="btn ghost" id="t-help">하는 법</button>
       <button class="btn ghost lab-entry" id="t-lab" ${window.__lumenAdmin ? '' : 'hidden'}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M7.5 15h9" stroke="currentColor" stroke-width="2"/></svg>밸런스 연구소</button>
     </div>
-    <div class="title-foot">덱 빌딩 로그라이크 「슬레이 더 스파이어」에 바치는 오마주입니다. 장르의 규칙을 빌려 왔고, 이야기·인물·카드·그림은 모두 새로 만들었습니다.</div>
   </div>`);
   if (sv) $('#t-cont').onclick = () => { g = sv; sfx('turn'); resume(); };
   $('#t-new').onclick = () => { sfx('card'); showSelect(); };
