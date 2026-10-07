@@ -838,3 +838,43 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; 
 .ent.rigged.dead .art { filter: none; }
 .ent.rigged.dead .bars, .ent.rigged.dead .sts, .ent.rigged.dead .nm, .ent.rigged.dead .intent { visibility: hidden; }
 .ent .art svg.rig { overflow: visible; }
+
+/* ---- 첫 실행 안내(투어): 구멍 밖을 어둡게 덮고, 구멍 테두리와 말풍선이 등불빛으로 은은하게 빛납니다 ---- */
+.tour { position: fixed; inset: 0; z-index: 120; }
+.tour-catch { position: absolute; inset: 0; cursor: default; }
+.tour-hole { position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 1.5px #f0a64ab8, 0 0 26px 4px #f0a64a40, inset 0 0 22px #f0a64a26, 0 0 0 9999px #03060ad1;
+  transition: left .3s cubic-bezier(.3,.7,.2,1), top .3s cubic-bezier(.3,.7,.2,1), width .3s cubic-bezier(.3,.7,.2,1), height .3s cubic-bezier(.3,.7,.2,1);
+  animation: tour-breathe 3.2s ease-in-out infinite; }
+@keyframes tour-breathe { 50% { box-shadow: 0 0 0 1.5px #f0a64ad8, 0 0 34px 7px #f0a64a52, inset 0 0 26px #f0a64a33, 0 0 0 9999px #03060ad1; } }
+.tour.still .tour-hole, .tour.still .tour-pop { transition: none; }
+.tour-pop { position: absolute; left: 0; top: 0; width: min(340px, calc(100vw / var(--z, 1) - 24px)); display: grid; gap: 7px; padding: 15px 18px 13px;
+  background: linear-gradient(180deg, #1b252e, #10181f); border: 1px solid #f0a64a80; border-radius: 12px;
+  box-shadow: 0 0 0 1px #000c, 0 22px 60px #000d, 0 0 34px #f0a64a24; transition: left .3s cubic-bezier(.3,.7,.2,1), top .3s cubic-bezier(.3,.7,.2,1); }
+.tour-pop.in > * { animation: tour-in .32s ease-out both; }
+@keyframes tour-in { from { opacity: 0; transform: translateY(4px); } }
+.tour-pop::before { content: ""; position: absolute; width: 12px; height: 12px; border: 1px solid #f0a64a80; transform: rotate(45deg); }
+.tour-pop[data-side="bottom"]::before { top: -7px; left: calc(var(--ax) - 6px); background: #1b252e; border-right: 0; border-bottom: 0; }
+.tour-pop[data-side="top"]::before { bottom: -7px; left: calc(var(--ax) - 6px); background: #10181f; border-left: 0; border-top: 0; }
+.tour-pop[data-side="right"]::before { left: -7px; top: calc(var(--ay) - 6px); background: #161f27; border-right: 0; border-top: 0; }
+.tour-pop[data-side="left"]::before { right: -7px; top: calc(var(--ay) - 6px); background: #161f27; border-left: 0; border-bottom: 0; }
+.tour-pop[data-side="over"]::before { display: none; }
+.tour-k { font-size: 11px; letter-spacing: .3em; color: var(--amber); }
+.tour-pop h3 { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 700; color: #f6e7c8; text-shadow: 0 0 18px #f0a64a33; }
+.tour-pop p { margin: 0; font-size: 14px; line-height: 1.65; color: #cfc6b5; word-break: keep-all; }
+.tour-pop p b { color: #ffd89a; }
+.tour-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+.tour-n { margin-right: auto; color: var(--mute); font-size: 12px; letter-spacing: .08em; }
+.tour-skip { background: none; border: 0; color: var(--mute); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.tour-skip:hover, .tour-skip:focus-visible { color: var(--ink); background: #ffffff0d; }
+.tour-next { min-width: 76px; }
+.tour-pop button:focus-visible { outline: 2px solid #ffd89a; outline-offset: 2px; }
+/* 하는 법 창의 안내 설정 */
+.tour-set { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #0d151b; }
+.tour-set-t { display: grid; gap: 2px; min-width: 0; }
+.tour-set-t b { font-family: var(--display); font-size: 15px; }
+.tour-set-t small { color: var(--mute); font-size: 12px; line-height: 1.5; }
+.tour-set-btns { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tour-off { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #cfc6b5; cursor: pointer; }
+.tour-off input { accent-color: var(--amber); width: 16px; height: 16px; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .tour-hole { animation: none; transition: none; } .tour-pop { transition: none; } .tour-pop.in > * { animation: none; } }

@@ -1,6 +1,8 @@
 """통합 테스트: 새 게임을 시작해 방 N개를 자동으로 진행합니다.
   python3 build.py && python3 tools/e2e.py sera 1280 800 run1 6
   난이도 단계로 시작: 맨 끝에 단계 번호(예: ... run1 6 5). 그 단계까지 열린 기록을 미리 넣고 고릅니다.
+  첫 실행 안내(투어)는 뜰 때마다 단계별 스크린샷({tag}-tour-<id>-<n>.png)을 남기고 Enter로 넘깁니다.
+  --no-tour 를 붙이면 pref.tourOff 를 미리 넣어 안내를 끄고 진행합니다.
 스크린샷은 build/shots/ 에 저장됩니다."""
 import asyncio, sys
 from playwright.async_api import async_playwright
@@ -10,6 +12,21 @@ OUT = str(ROOT / 'build' / 'shots') + '/'
 Path(OUT).mkdir(parents=True, exist_ok=True)
 URL = 'file://' + str(ROOT / 'build' / 'test.html')
 
+
+TAG = ''
+async def tours(pg, wait=0):
+    """투어가 떠 있으면 단계마다 스크린샷을 남기고 '다음'(Enter)으로 끝까지 넘깁니다."""
+    if wait:
+        try: await pg.wait_for_selector('#tour', timeout=wait)
+        except Exception: pass
+    for _ in range(40):
+        el = await pg.query_selector('#tour')
+        if not el: return
+        tid = await el.get_attribute('data-id')
+        k = (await pg.inner_text('#tour .tour-n')).split('/')[0].strip()
+        await pg.wait_for_timeout(450)
+        await pg.screenshot(path=OUT + f'{TAG}-tour-{tid}-{k}.png')
+        await pg.keyboard.press('Enter'); await pg.wait_for_timeout(150)
 
 async def choose(pg, shot=None):
     c = await pg.query_selector('.overlay .card-grid .card:not(.disabled)')
@@ -22,6 +39,7 @@ async def choose(pg, shot=None):
 
 async def combat(pg):
     for turn in range(30):
+        await tours(pg)
         for k in range(8):
             if await pg.query_selector('.overlay:not(:has(.card-grid))'): return
             playable = await pg.query_selector_all('#hand .card.playable')
@@ -42,7 +60,9 @@ async def combat(pg):
             if await pg.query_selector('#end-turn:not([disabled])') or await pg.query_selector('.overlay') or await pg.query_selector('.over-screen'): break
         await pg.wait_for_timeout(300)
 
-async def main(ch, w, h, tag, rooms, asc=0):
+async def main(ch, w, h, tag, rooms, asc=0, notour=False):
+    global TAG
+    TAG = tag
     async with async_playwright() as p:
         b = await p.chromium.launch()
         pg = await b.new_page(viewport={'width': w, 'height': h})
@@ -51,18 +71,22 @@ async def main(ch, w, h, tag, rooms, asc=0):
         await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
         if asc:
             await pg.add_init_script("localStorage.setItem('lumen-descent-meta-v1', JSON.stringify({open: {%s: %d}}))" % (ch, asc))
+        if notour:
+            await pg.add_init_script("localStorage.setItem('lumen-descent-pref-v1', JSON.stringify({sound: true, tourOff: true}))")
         await pg.goto(URL)
         await pg.click('#t-new'); await pg.click(f'.char-card[data-ch="{ch}"]')
         if asc: await pg.click(f'.asc-chip[data-asc="{asc}"]')
         await pg.wait_for_timeout(200); await pg.screenshot(path=OUT + f'{tag}-select.png', full_page=True)
         await pg.click('#s-go')
         await pg.wait_for_timeout(200); await pg.click('#st-go'); await pg.wait_for_timeout(300)
+        await tours(pg, 1500)
         shots = set(); log = []
         for n in range(rooms):
             if await pg.query_selector('.over-screen'):
                 await pg.screenshot(path=OUT + f'{tag}-over.png'); log.append('OVER'); break
             if await pg.query_selector('#st-go'):
                 await pg.click('#st-go'); await pg.wait_for_timeout(300)
+            await tours(pg)
             nodes = await pg.query_selector_all('.node.avail')
             if not nodes: log.append('no nodes'); break
             await nodes[0].click(force=True)
@@ -71,11 +95,13 @@ async def main(ch, w, h, tag, rooms, asc=0):
             kind = scr.split()[1] if len(scr.split()) > 1 else scr
             log.append(kind)
             if kind == 'combat-screen':
+                await tours(pg, 2500)
                 if 'combat' not in shots:
                     await pg.wait_for_timeout(900); await pg.screenshot(path=OUT + f'{tag}-combat.png'); shots.add('combat')
                 await combat(pg)
                 await pg.wait_for_timeout(1300)
                 if await pg.query_selector('.over-screen'): continue
+                await tours(pg, 1500)
                 if 'reward' not in shots: await pg.screenshot(path=OUT + f'{tag}-reward.png'); shots.add('reward')
                 # 카드 보상 열기
                 rws = await pg.query_selector_all('.reward:not([disabled])')
@@ -86,6 +112,7 @@ async def main(ch, w, h, tag, rooms, asc=0):
                     t = await x.inner_text()
                     if '카드' in t:
                         await x.click(); await pg.wait_for_timeout(200)
+                        await tours(pg, 1000)
                         if 'pick' not in shots: await pg.screenshot(path=OUT + f'{tag}-pick.png'); shots.add('pick')
                         c = await pg.query_selector('.choice-row .card')
                         if c: await c.click(); await pg.wait_for_timeout(200)
@@ -97,9 +124,11 @@ async def main(ch, w, h, tag, rooms, asc=0):
                     await pg.screenshot(path=OUT + f'{tag}-bossks.png'); shots.add('boss')
                 if bk: await bk.click(); await pg.wait_for_timeout(300)
             elif kind == 'shop-screen':
+                await tours(pg, 1200)
                 await pg.screenshot(path=OUT + f'{tag}-shop.png', full_page=True); shots.add('shop')
                 await pg.click('#sh-leave'); await pg.wait_for_timeout(200)
             elif kind == 'room-screen':
+                await tours(pg, 1200)
                 if await pg.query_selector('#rs-rest'):
                     await pg.screenshot(path=OUT + f'{tag}-rest.png'); await pg.click('#rs-smith' if await pg.query_selector('#rs-smith:not([disabled])') else '#rs-rest')
                     await pg.wait_for_timeout(200)
@@ -135,6 +164,8 @@ async def main(ch, w, h, tag, rooms, asc=0):
         print(tag, 'errors:', errs[:6])
         await b.close()
 
-ch = sys.argv[1]; w = int(sys.argv[2]); h = int(sys.argv[3]); tag = sys.argv[4]; rooms = int(sys.argv[5])
-asc = int(sys.argv[6]) if len(sys.argv) > 6 else 0
-asyncio.run(main(ch, w, h, tag, rooms, asc))
+notour = '--no-tour' in sys.argv
+args = [a for a in sys.argv if a != '--no-tour']
+ch = args[1]; w = int(args[2]); h = int(args[3]); tag = args[4]; rooms = int(args[5])
+asc = int(args[6]) if len(args) > 6 else 0
+asyncio.run(main(ch, w, h, tag, rooms, asc, notour))

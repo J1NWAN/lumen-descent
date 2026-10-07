@@ -21,7 +21,7 @@ let sel = null;      // 선택한 손패 인덱스
 let tonicSel = null; // 대상 지정 중인 약병 칸
 let kbTarget = 0;
 let seenHand = new Set();
-let pref = { sound: true };
+let pref = { sound: true, tour: [], tourOff: false };
 
 const stage = () => $('#stage');
 function tryLS(fn, fb) { try { return fn(); } catch (e) { return fb; } }
@@ -421,8 +421,21 @@ function showHelp() {
     <p><b>방어.</b> 방어는 피해를 먼저 막아 주지만, 내 턴이 시작되면 사라집니다.</p>
     <p><b>덱 빌딩.</b> 이길 때마다 카드 3장 중 하나를 고르거나 건너뜁니다. 덱이 얇을수록 좋은 카드가 자주 손에 옵니다.</p>
     <p><b>단축키.</b> 1–9: 카드 고르기 · ←/→: 대상 바꾸기 · Enter: 사용 · E: 턴 종료 · Esc: 취소</p></div>
+    <div class="tour-set">
+      <div class="tour-set-t"><b>화면 안내</b><small id="hp-tour-st"></small></div>
+      <div class="tour-set-btns"><button class="btn small" id="hp-tour">안내 다시 보기</button>
+        <label class="tour-off"><input type="checkbox" id="hp-off" ${pref.tourOff ? 'checked' : ''}><span>안내 끄기</span></label></div>
+    </div>
     <div class="row"><button class="btn primary" data-close>알겠어요</button></div></div>`);
   o.querySelector('[data-close]').onclick = () => o.remove();
+  const st = $('#hp-tour-st', o), paint = msg => { st.textContent = msg || (pref.tourOff ? '안내가 꺼져 있습니다.' : '각 화면에 처음 들어가면 짧은 안내가 나옵니다.'); };
+  paint();
+  $('#hp-tour', o).onclick = () => {
+    tourSeen.clear(); pref.tour = []; pref.tourOff = false; savePref();
+    $('#hp-off', o).checked = false; sfx('card');
+    paint('기록을 지웠습니다. 다음에 각 화면에 들어가면 안내가 다시 나옵니다.');
+  };
+  $('#hp-off', o).onchange = e => { pref.tourOff = e.target.checked; savePref(); paint(); };
 }
 function showSelect() {
   let pickCh = 'sera';
@@ -544,7 +557,7 @@ function mapSVG(interactive) {
   return `<svg class="map-svg" viewBox="0 0 ${G.W} ${G.H}" role="img" aria-label="${esc(L.STRATA[g.stratum].n)} 지도">${edges}${nodes}</svg>`;
 }
 function legendHTML() {
-  return `<div class="map-legend" aria-label="범례">${['m', 'E', 'e', 'R', 'S', 'T'].map(t => `<div><svg viewBox="0 0 24 24" style="color:${{ m: '#b8c4cc', E: '#e8735a', e: '#9fc9d8', R: '#f0a64a', S: '#e8b84a', T: '#d9b46a' }[t]}">${A.ICON[t]}</svg>${L.ROOM[t]}</div>`).join('')}</div>`;
+  return `<div class="map-legend" data-tour="map-legend" aria-label="범례">${['m', 'E', 'e', 'R', 'S', 'T'].map(t => `<div><svg viewBox="0 0 24 24" style="color:${{ m: '#b8c4cc', E: '#e8735a', e: '#9fc9d8', R: '#f0a64a', S: '#e8b84a', T: '#d9b46a' }[t]}">${A.ICON[t]}</svg>${L.ROOM[t]}</div>`).join('')}</div>`;
 }
 function showMap() {
   g.phase = 'map'; C = null; save(); renderHUD(); scene(false);
@@ -567,6 +580,7 @@ function showMap() {
       sc.style.scrollBehavior = '';
     });
   }
+  tourWhen(['map'], () => g && !C && g.phase === 'map' && stage().firstElementChild === el && !$('.overlay', stage()), 400);
 }
 function showMapPeek() {
   sheet({ title: L.STRATA[g.stratum].n, sub: '지금 있는 방은 등불 색으로 표시됩니다.', body: mapSVG(false), cls: 'mappeek' });
@@ -597,6 +611,8 @@ function startFight(ids, kind, extra) {
   banner(kind === 'boss' ? L.ENEMIES[ids[0]].n : kind === 'elite' ? '정예 등장' : '1턴');
   if (kind === 'boss') sfx('ignite'); else sfx('turn');
   processEvents();
+  const cc = C;
+  tourWhen(['combat', 'hero-' + g.ch], () => C === cc && !busy && !C.won && !C.lost && !C.pending && sel === null && tonicSel === null && !$('.overlay', stage()) && !!$('#hand .card'), 1300);
 }
 function banner(text, enemy) {
   const f = $('#field'); if (!f) return;
@@ -1032,7 +1048,7 @@ function showReward(title) {
   const bg = stage().firstElementChild;
   closeOverlays();
   const o = overlay(`<div class="panel"><h2>${esc(title || '전리품')}</h2><div class="sub">원하는 것만 챙기세요.</div>
-    <div class="reward-list">${g.rewards.map((r, i) => `<button class="reward" data-i="${i}" ${r.done ? 'disabled' : ''}>${rewardIcon(r)}<span>${r.k === 'shards' ? esc(rewardLabel(r)) : rewardLabel(r).replace(/^([^<]+)/, m => esc(m))}</span></button>`).join('')}</div>
+    <div class="reward-list">${g.rewards.map((r, i) => `<button class="reward" data-i="${i}" ${r.k === 'card' ? 'data-tour="reward-card"' : ''} ${r.done ? 'disabled' : ''}>${rewardIcon(r)}<span>${r.k === 'shards' ? esc(rewardLabel(r)) : rewardLabel(r).replace(/^([^<]+)/, m => esc(m))}</span></button>`).join('')}</div>
     <div class="row"><button class="btn primary" id="rw-go">${g.bossDone ? '더 깊이' : '지도로'}</button></div></div>`);
   $$('.reward', o).forEach(b => b.onclick = () => {
     const i = +b.dataset.i; const r = g.rewards[i];
@@ -1041,6 +1057,7 @@ function showReward(title) {
     if (L.claimReward(g, i)) { sfx(r.k === 'shards' ? 'coin' : 'heal'); if (r.k === 'ks') setTimeout(() => flashKs(r.id), 50); o.remove(); showReward(title); }
   });
   $('#rw-go', o).onclick = () => { o.remove(); afterRewards(); };
+  tourWhen(['reward'], () => o.isConnected && !$('.overlay .choice-row'), 450);
 }
 function pickCardReward(i) {
   const r = g.rewards[i];
@@ -1053,6 +1070,7 @@ function pickCardReward(i) {
   });
   $('#cr-back', o).onclick = () => o.remove();
   $('#cr-skip', o).onclick = () => { r.done = true; closeOverlays(); showReward(); };
+  tourWhen(['pick'], () => o.isConnected && !$('.overlay.confirm'), 300);
 }
 function afterRewards() {
   if (g.bossDone) {
@@ -1088,8 +1106,8 @@ function showShop() {
       <button class="btn primary" id="sh-leave">떠나기</button></div>
     <div class="shop-cards">${cardItems.map(({ it, i }) => `<button class="ware ${it.sold ? 'sold' : ''}" data-i="${i}" ${g.shards < it.price ? 'disabled' : ''}>${cardHTML({ id: it.id, up: it.up })}<span class="price ${g.shards < it.price ? 'cant' : ''}">${IC.shard.replace('<svg', '<svg width="14" height="14"')}${it.price}${it.sale ? '<span class="sale">반값</span>' : ''}</span></button>`).join('')}</div>
     <div class="shop-lower">
-      <div class="shelf"><h3>유품</h3><div class="shelf-items">${ksItems.map(({ it, i }) => `<button class="shelf-item" data-i="${i}" ${it.sold || g.shards < it.price ? 'disabled' : ''} data-tip="${esc(ksTip(it.id))}">${A.ksIcon(it.id, L.KS[it.id].r)}<span><span class="nm">${esc(L.KS[it.id].n)}</span><br><span class="price ${g.shards < it.price ? 'cant' : ''}">${it.sold ? '팔림' : it.price}</span></span></button>`).join('') || '<span style="color:var(--mute)">남은 유품이 없습니다.</span>'}</div></div>
-      <div class="shelf"><h3>약병</h3><div class="shelf-items">${tItems.map(({ it, i }) => `<button class="shelf-item" data-i="${i}" ${it.sold || g.shards < it.price ? 'disabled' : ''} data-tip="${esc(tonicTip(it.id))}">${A.tonicIcon(it.id)}<span><span class="nm">${esc(L.TONICS[it.id].n)}</span><br><span class="price ${g.shards < it.price ? 'cant' : ''}">${it.sold ? '팔림' : it.price}</span></span></button>`).join('')}</div></div>
+      <div class="shelf" data-tour="shop-ks"><h3>유품</h3><div class="shelf-items">${ksItems.map(({ it, i }) => `<button class="shelf-item" data-i="${i}" ${it.sold || g.shards < it.price ? 'disabled' : ''} data-tip="${esc(ksTip(it.id))}">${A.ksIcon(it.id, L.KS[it.id].r)}<span><span class="nm">${esc(L.KS[it.id].n)}</span><br><span class="price ${g.shards < it.price ? 'cant' : ''}">${it.sold ? '팔림' : it.price}</span></span></button>`).join('') || '<span style="color:var(--mute)">남은 유품이 없습니다.</span>'}</div></div>
+      <div class="shelf" data-tour="shop-tonic"><h3>약병</h3><div class="shelf-items">${tItems.map(({ it, i }) => `<button class="shelf-item" data-i="${i}" ${it.sold || g.shards < it.price ? 'disabled' : ''} data-tip="${esc(tonicTip(it.id))}">${A.tonicIcon(it.id)}<span><span class="nm">${esc(L.TONICS[it.id].n)}</span><br><span class="price ${g.shards < it.price ? 'cant' : ''}">${it.sold ? '팔림' : it.price}</span></span></button>`).join('')}</div></div>
       <div class="shelf"><h3>망각 의식</h3><p style="margin:0;color:#cfc6b5;font-size:13px;line-height:1.6">덱에서 카드 1장을 영원히 지웁니다. 한 번 할 때마다 값이 오릅니다.</p>
         <button class="btn" id="sh-remove" ${sh.removed || g.shards < sh.removePrice ? 'disabled' : ''}>${sh.removed ? '오늘은 끝' : `카드 지우기 · ${sh.removePrice}`}</button></div>
     </div></div>`);
@@ -1100,6 +1118,7 @@ function showShop() {
   });
   $('#sh-remove').onclick = () => chooseCards({ title: '지울 카드', sub: '카드를 누르면 확인 창이 뜹니다. 지운 카드는 되돌릴 수 없습니다.', cards: g.deck.slice().sort(sortCards), ok: '지우기', tone: 'danger', q: c => `「${L.CARDS[c.id].n}${c.up ? '+' : ''}」을(를) 덱에서 지울까요?`, done: c => { if (c && L.buyRemove(g, c.uid)) { sfx('ignite'); showShop(); } } });
   $('#sh-leave').onclick = showMap;
+  tourWhen(['shop'], () => stage().firstElementChild === el && !$('.overlay', stage()), 350);
 }
 const REST_IC = {
   rest: '<svg viewBox="0 0 24 24"><path d="M12 3c-4 5-6 8-6 11a6 6 0 0 0 12 0c0-3-2-6-6-11Z" fill="currentColor"/><path d="M4 21h16" stroke="currentColor" stroke-width="2"/></svg>',
@@ -1107,7 +1126,7 @@ const REST_IC = {
 };
 function showRest(result) {
   g.phase = 'rest'; renderHUD(); scene(false);
-  const heal = Math.min(g.maxHp - g.hp, Math.floor(g.maxHp * 0.3) + (L.hasKs(g, 'lampOil') ? 15 : 0));
+  const heal = Math.min(g.maxHp - g.hp, Math.floor(g.maxHp * ((g.mods && g.mods.rest) || 0.3)) + (L.hasKs(g, 'lampOil') ? 15 : 0));
   const canSmith = g.deck.some(L.canUp);
   const el = setScreen('room-screen', `<div class="room">
     <div class="room-art" style="--art-glow:#f0a64a55">${LAMP.replace('class="title-lamp"', 'style="height:110px"')}</div>
@@ -1119,6 +1138,7 @@ function showRest(result) {
       <button class="opt" id="rs-smith" ${canSmith ? '' : 'disabled'}>${REST_IC.smith}<b>연마</b><small>카드 1장 강화</small></button>
     </div>`}</div>`);
   if (result) { $('#rs-go').onclick = showMap; return; }
+  tourWhen(['rest'], () => stage().firstElementChild === el && !$('.overlay', stage()), 350);
   $('#rs-rest').onclick = () => { const n = L.restHeal(g); sfx('heal'); showRest(`불 곁에서 눈을 붙였다. 체력을 ${n} 회복했다.`); };
   $('#rs-smith').onclick = () => chooseCards({ title: '강화할 카드', sub: '카드를 누르면 강화 전후를 나란히 보여 줍니다.', disabledMsg: '이미 강화된 카드입니다.', q: c => `「${L.CARDS[c.id].n}」을(를) 강화할까요?`, cards: g.deck.slice().sort(sortCards), disabled: c => !L.canUp(c), previewUp: true, ok: '강화', done: c => { if (c && L.upgradeCard(g, c.uid)) { sfx('ignite'); showRest(`불에 달궈 「${L.CARDS[c.id].n}」을(를) 벼렸다.`); } } });
 }
@@ -1138,7 +1158,7 @@ function showEvent(id) {
     <div class="room-art" style="--art-glow:#9fc9d855"><svg viewBox="0 0 24 24" style="color:#9fc9d8">${A.ICON.e}</svg></div>
     <div class="eyebrow">미지의 방</div><h2>${esc(E.n)}</h2>
     <p class="prose">${esc(E.tx)}</p>
-    <div class="opts">${E.opts.map((op, i) => { const ok = !op.req || op.req(g); return `<button class="opt" data-i="${i}" ${ok ? '' : 'disabled'}><b>${esc(op.tx)}</b><small>${esc(op.sub)}${ok ? '' : ' · 조건이 맞지 않습니다'}</small></button>`; }).join('')}</div></div>`);
+    <div class="opts" data-tour="event-opts">${E.opts.map((op, i) => { const ok = !op.req || op.req(g); return `<button class="opt" data-i="${i}" ${ok ? '' : 'disabled'}><b>${esc(op.tx)}</b><small>${esc(op.sub)}${ok ? '' : ' · 조건이 맞지 않습니다'}</small></button>`; }).join('')}</div></div>`);
   $$('.opt', el).forEach(b => b.onclick = () => {
     const op = E.opts[+b.dataset.i];
     const res = op.fn(g); sfx('card'); renderHUD();
@@ -1159,6 +1179,7 @@ function showEvent(id) {
     }
     finish();
   });
+  tourWhen(['event'], () => stage().firstElementChild === el && !$('.overlay', stage()), 350);
 }
 function eventResult(E, text, res) {
   renderHUD();
@@ -1214,6 +1235,224 @@ function showOver() {
   $('#ov-deck').onclick = () => viewCards('마지막 덱', last.deck.slice().sort(sortCards));
   $('#ov-again').onclick = () => { g = null; showSelect(); };
 }
+
+/* =====================================================================
+   첫 실행 안내(투어) — 화면에 처음 왔을 때 설명할 곳만 밝게 두고 나머지를 어둡게 덮습니다.
+   설명만 보여 주는 형식입니다. 투어 중에는 뒤쪽 게임 입력을 막습니다.
+   - 대상은 단계마다 선택자로 다시 찾습니다(전투 화면은 innerHTML로 다시 그려지므로).
+     t 가 배열이면 앞에서부터 찾아 처음 보이는 것을 쓰고, 선택자에 쉼표가 있으면 모두 감싸는 영역을 씁니다.
+   - 본 기록은 pref.tour, 끄기는 pref.tourOff. 저장소가 막히면 이번 방문 동안 메모리에만 남습니다.
+   ===================================================================== */
+const handCards = re => () => C ? $$('#hand .card').filter(el => { const c = C.hand[+el.dataset.i]; return c && re.test(L.CARDS[c.id].tx); }) : [];
+const TOURS = {
+  map: { k: '지도', steps: [
+    { t: '[data-tour="map-legend"]', h: '방의 종류', p: '지도의 문양은 방의 종류입니다. 정예는 강하지만 유품을 남기고, 쉼터와 상인에서는 숨을 고릅니다. 미지의 방에서는 무슨 일이든 일어납니다.' },
+    { t: '.map-screen .node.avail', h: '길 고르기', p: '빛나는 방이 지금 들어갈 수 있는 곳입니다. 들어간 방에서 아래로 이어진 길만 다음에 고를 수 있고, 층 맨 아래에는 그 층의 주인이 기다립니다.' },
+    { t: '#hud .hud-hp, #hud .hud-shards', h: '체력과 파편', p: '체력은 전투가 끝나도 그대로 이어집니다. 파편은 상인에게서 카드·유품·약병을 살 때 씁니다.' },
+    { t: '#hud-deck', h: '덱 보기', p: '지금 덱에 든 카드를 언제든 펼쳐 볼 수 있습니다. 오른쪽 끝 메뉴에서는 잠시 멈추거나 처음 화면으로 나갈 수 있습니다.' },
+  ] },
+  combat: { k: '전투', steps: [
+    { t: '#hand .card', h: '손패', p: '매 턴 카드 5장을 받습니다. 카드를 적에게 끌어 놓거나, 눌러서 고른 뒤 대상을 누르면 씁니다. 쓰지 않은 카드는 턴이 끝나면 버려집니다.' },
+    { t: '#leftcol', h: '빛', p: '카드 왼쪽 위 숫자가 그 카드에 드는 <b>빛</b>입니다. 빛은 매 턴 3으로 다시 차오릅니다. 아래 더미는 앞으로 뽑을 카드입니다.' },
+    { t: '.ent.foe .intent', h: '적의 의도', p: '적 머리 위 표시는 다음 차례에 할 행동입니다. 칼 옆 숫자만큼 공격해 오니, 그만큼 막을지 먼저 쓰러뜨릴지 정하세요.' },
+    { t: '.ent.player', h: '방어', p: '<b>방어</b>는 들어오는 피해를 먼저 막아 줍니다. 하지만 내 턴이 시작되면 사라지니, 적이 공격해 오는 턴에 맞춰 쌓으세요.' },
+    { t: '#rightcol', h: '턴 종료', p: '할 일을 마쳤다면 턴 종료를 누르세요. 손패는 버린 더미로 가고, 뽑을 더미가 바닥나면 버린 카드를 섞어 다시 씁니다.' },
+  ] },
+  'hero-sera': { k: '세라', steps: [
+    { t: '.ent.player', h: '불씨', p: '「불씨 찌르기」 같은 카드는 세라에게 <b>불씨</b>를 쌓습니다. 쌓인 불씨는 세라 아래 상태 칸에 표시되고, 몸의 불빛도 함께 짙어집니다.' },
+    { t: [handCards(/불씨/), '#hand .card'], h: '점화', p: '「점화 베기」 같은 점화 카드는 쌓인 불씨를 한꺼번에 태워 큰 피해를 냅니다. 불씨를 넉넉히 모은 뒤 터뜨리세요.' },
+  ] },
+  'hero-noa': { k: '노아', steps: [
+    { t: '#tide', h: '조수', p: '노아의 전투에는 <b>밀물</b>과 <b>썰물</b>이 흐릅니다. 1턴은 밀물로 시작해 매 턴 바뀌고, 지금의 조수는 여기에 표시됩니다.' },
+    { t: [handCards(/조수|밀물|썰물/), '#hand .card'], h: '물때 읽기', p: '조수에 따라 효과가 달라지는 카드가 있습니다. 「물때 바꾸기」로 조수를 그 자리에서 뒤집을 수도 있습니다.' },
+    { t: [handCards(/부식/), '.side.foes'], h: '부식', p: '「독침」이 거는 <b>부식</b>은 적의 턴이 시작될 때마다 방어를 무시하고 체력을 깎습니다. 수치는 한 번에 1씩 줄어듭니다.' },
+  ] },
+  'hero-rin': { k: '린', steps: [
+    { t: [handCards(/표식/), '.side.foes'], h: '표식', p: '「사냥감 표시」로 적에게 <b>표식</b>을 새기면, 그 적은 공격받을 때마다 표식만큼 피해를 더 받습니다. 표식은 맞을 때마다 1씩 옅어집니다.' },
+    { t: [handCards(/연계/), '#hand .card'], h: '연계', p: '<b>[연계 N]</b> 효과는 이번 턴에 앞서 카드를 N장 이상 썼을 때 터집니다. 가벼운 카드로 먼저 흐름을 만든 뒤 마무리하세요.' },
+    { t: '.ent.player', h: '회피', p: '린은 <b>회피</b>를 얻는 카드를 익힐 수 있습니다. 회피는 적의 차례에 받는 공격 피해를 절반으로 줄이고, 내 턴이 시작되면 사라집니다.' },
+  ] },
+  reward: { k: '전리품', steps: [
+    { t: '.overlay .reward-list', h: '전리품', p: '이긴 대가입니다. 원하는 것만 눌러 챙기세요. 남겨 둔 것은 떠나면 사라집니다.' },
+    { t: '.overlay [data-tour="reward-card"]', h: '카드 보상', p: '누르면 카드 3장 중 하나를 고르거나 건너뛸 수 있습니다. 덱이 얇을수록 좋은 카드가 자주 손에 오니, 꼭 필요한 카드만 넣으세요.' },
+    { t: '#rw-go', h: '다시 길로', p: '다 챙겼으면 지도로 돌아가 다음 방을 고릅니다.' },
+  ] },
+  pick: { k: '카드 고르기', steps: [
+    { t: '.overlay .choice-row', h: '한 장만', p: '셋 중 한 장을 눌러 덱에 넣습니다. 지금 덱에 무엇이 모자란지 떠올리며 고르세요.' },
+    { t: '#cr-skip', h: '건너뛰기', p: '마음에 드는 카드가 없다면 건너뛰세요. 어중간한 카드를 넣기보다 덱을 가볍게 두는 편이 나을 때가 많습니다.' },
+  ] },
+  shop: { k: '상인', steps: [
+    { t: '.shop-cards', h: '카드', p: '파편으로 카드를 삽니다. 한 장은 반값이고, 가격이 붉게 보이면 파편이 모자란 것입니다.' },
+    { t: '[data-tour="shop-ks"]', h: '유품', p: '<b>유품</b>은 여정 내내 효과가 이어지는 물건입니다. 비싸지만 오래도록 값을 합니다.' },
+    { t: '[data-tour="shop-tonic"]', h: '약병', p: '<b>약병</b>은 전투 중에 한 번 쓰는 소모품입니다. 위쪽 약병 칸이 가득 차면 더 살 수 없습니다.' },
+    { t: '#sh-remove', h: '카드 지우기', p: '덱에서 카드 한 장을 영원히 지웁니다. 약한 기본 카드를 빼면 좋은 카드가 더 자주 옵니다. 할 때마다 값이 오릅니다.' },
+  ] },
+  rest: { k: '쉼터', steps: [
+    { t: '#rs-rest', h: '휴식', p: '화톳불 곁에서 눈을 붙여 체력을 회복합니다. 회복량은 버튼에 적혀 있습니다.' },
+    { t: '#rs-smith', h: '연마', p: '카드 한 장을 강화합니다. 강화하면 수치가 오르거나 비용이 줄어듭니다. 쉼터에서는 둘 중 하나만 할 수 있습니다.' },
+  ] },
+  event: { k: '미지의 방', steps: [
+    { t: '[data-tour="event-opts"]', h: '선택', p: '미지의 방에서는 하나를 골라야 합니다. 작은 글씨가 얻고 잃는 것을 알려 줍니다. 한 번 고르면 되돌릴 수 없습니다.' },
+    { t: '#hud .hud-hp, #hud .hud-shards', h: '대가', p: '선택의 대가로 체력이나 파편이 바뀌기도 합니다. 고르기 전에 지금 남은 양을 확인하세요.' },
+  ] },
+};
+const tourSeen = new Set(Array.isArray(pref.tour) ? pref.tour : []);
+let tour = null;         // 진행 중인 투어
+const tourQ = [];        // 기다리는 투어 { id, ready }
+function tourMark(id) { tourSeen.add(id); pref.tour = [...tourSeen]; savePref(); }
+function tourTargets(t) {
+  for (const x of [].concat(t)) {
+    const els = (typeof x === 'function' ? x() : $$(x)).filter(e => e.isConnected && e.getClientRects().length);
+    if (els.length) return els;
+  }
+  return [];
+}
+function tourRect(els) {
+  const rs = els.map(e => UIZ.rect(e.getBoundingClientRect())).filter(r => r.width || r.height);
+  if (!rs.length) return null;
+  const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), r = Math.max(...rs.map(r => r.right)), b = Math.max(...rs.map(r => r.bottom));
+  return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+}
+/* 대상이 스크롤 영역 밖에 있으면 그 영역만 살짝 굴려 가운데로 옵니다(게임 상태는 건드리지 않습니다). */
+function tourReveal(el) {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight + 2) {
+      const r = UIZ.rect(el.getBoundingClientRect()), pr = UIZ.rect(p.getBoundingClientRect());
+      if (r.top < pr.top + 8 || r.bottom > pr.bottom - 8) {
+        p.style.scrollBehavior = 'auto';
+        p.scrollTop += (r.top + Math.min(r.height, pr.height) / 2) - (pr.top + pr.height / 2);
+        p.style.scrollBehavior = '';
+      }
+      return;
+    }
+  }
+}
+/* ids 투어를 ready() 가 참이 될 때(플레이어 입력 대기) 띄웁니다. 이미 봤거나 꺼져 있으면 아무것도 하지 않습니다. */
+function tourWhen(ids, ready, delay) {
+  if (pref.tourOff) return;
+  ids = ids.filter(id => TOURS[id] && !tourSeen.has(id) && !(tour && tour.id === id) && !tourQ.some(q => q.id === id));
+  if (!ids.length) return;
+  let left = 60;   // 투어가 진행 중이 아닐 때 기다리는 횟수(150ms 단위)
+  const poll = () => {
+    if (pref.tourOff) return;
+    if (tour) { setTimeout(poll, 250); return; }
+    let ok = false; try { ok = ready(); } catch (e) {}
+    if (ok) { ids.forEach(id => tourQ.push({ id, ready })); tourNext(); return; }
+    if (--left > 0) setTimeout(poll, 150);
+  };
+  setTimeout(poll, delay || 0);
+}
+function tourNext() {
+  while (!tour && tourQ.length) {
+    const q = tourQ.shift();
+    let ok = false; try { ok = q.ready(); } catch (e) {}
+    if (ok && !tourSeen.has(q.id) && !pref.tourOff) tourStart(q.id);
+  }
+}
+function tourStart(id) {
+  const steps = TOURS[id].steps.filter(s => tourTargets(s.t).length);
+  if (!steps.length) return;
+  hideTip();
+  const root = document.createElement('div');
+  root.id = 'tour'; root.className = 'tour'; root.dataset.id = id;
+  root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-labelledby', 'tour-h');
+  root.innerHTML = `<div class="tour-catch"></div><div class="tour-hole"></div>
+    <div class="tour-pop" data-side="over"><div class="tour-k">${esc(TOURS[id].k)} 안내</div><h3 id="tour-h"></h3><p></p>
+      <div class="tour-row"><span class="tour-n num"></span><button class="tour-skip" type="button">건너뛰기</button><button class="btn primary small tour-next" type="button">다음</button></div></div>`;
+  document.body.appendChild(root);
+  tour = { id, steps, i: -1, root, scr: stage().firstElementChild, key: '', miss: 0, raf: 0, fresh: true };
+  root.querySelector('.tour-skip').onclick = () => tourEnd(true);
+  root.querySelector('.tour-next').onclick = () => tourGo(tour.i + 1, 1);
+  root.querySelector('.tour-catch').addEventListener('pointerdown', e => e.preventDefault());
+  tourGo(0, 1);
+  if (tour) tour.raf = requestAnimationFrame(tourFrame);
+}
+function tourGo(i, dir) {
+  const T = tour; if (!T) return;
+  while (i >= 0 && i < T.steps.length && !tourTargets(T.steps[i].t).length) i += dir;   // 대상이 사라진 단계는 조용히 건너뜁니다
+  if (i < 0) return;
+  if (i >= T.steps.length) { tourEnd(true); return; }
+  const S = T.steps[i], pop = T.root.querySelector('.tour-pop');
+  T.i = i; T.key = ''; T.miss = 0;
+  tourReveal(tourTargets(S.t)[0]);
+  pop.querySelector('h3').textContent = S.h;
+  pop.querySelector('p').innerHTML = S.p;
+  pop.querySelector('.tour-n').textContent = `${i + 1} / ${T.steps.length}`;
+  const nx = pop.querySelector('.tour-next');
+  nx.textContent = i === T.steps.length - 1 ? '알겠어요' : '다음';
+  pop.classList.remove('in'); void pop.offsetWidth; pop.classList.add('in');
+  tourPlace();
+  try { nx.focus({ preventScroll: true }); } catch (e) {}
+}
+/* 구멍과 말풍선 자리 잡기. 대상이 움직이거나 창 크기가 바뀌면 매 프레임 다시 맞춥니다. */
+function tourPlace() {
+  const T = tour; if (!T) return;
+  const els = tourTargets(T.steps[T.i].t);
+  if (!els.length) { if (++T.miss > 30) tourGo(T.i + 1, 1); return; }
+  T.miss = 0;
+  const vw = UIZ.w(), vh = UIZ.h(), R = tourRect(els); if (!R) return;
+  /* 창 크기가 바뀌어(회전 등) 대상이 화면 밖으로 밀려나면 한 번 다시 굴려 보여 줍니다 */
+  const seen = Math.max(0, Math.min(vh, R.bottom) - Math.max(0, R.top));
+  const rk = T.i + ':' + Math.round(vw) + 'x' + Math.round(vh);
+  if (seen < Math.min(R.height, vh) * 0.6 && T.rk !== rk) { T.rk = rk; tourReveal(els[0]); return; }
+  const pad = vw < 520 ? 6 : 9, m = 8;
+  const hole = { left: Math.max(m, R.left - pad), top: Math.max(m, R.top - pad) };
+  hole.right = Math.min(vw - m, R.right + pad); hole.bottom = Math.min(vh - m, R.bottom + pad);
+  hole.width = Math.max(0, hole.right - hole.left); hole.height = Math.max(0, hole.bottom - hole.top);
+  const key = [hole.left, hole.top, hole.width, hole.height, vw, vh].map(Math.round).join();
+  if (key === T.key) return;
+  T.key = key;
+  const h = T.root.querySelector('.tour-hole'), pop = T.root.querySelector('.tour-pop');
+  T.root.classList.toggle('still', T.fresh); T.fresh = false;
+  Object.assign(h.style, { left: hole.left + 'px', top: hole.top + 'px', width: hole.width + 'px', height: hole.height + 'px' });
+  const pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 14, edge = 12;
+  const cx = (hole.left + hole.right) / 2, cy = (hole.top + hole.bottom) / 2;
+  const clampX = x => Math.max(edge, Math.min(vw - pw - edge, x)), clampY = y => Math.max(edge, Math.min(vh - ph - edge, y));
+  const C4 = {
+    bottom: () => ({ x: clampX(cx - pw / 2), y: hole.bottom + gap, ok: hole.bottom + gap + ph <= vh - edge }),
+    top: () => ({ x: clampX(cx - pw / 2), y: hole.top - gap - ph, ok: hole.top - gap - ph >= edge }),
+    right: () => ({ x: hole.right + gap, y: clampY(cy - ph / 2), ok: hole.right + gap + pw <= vw - edge }),
+    left: () => ({ x: hole.left - gap - pw, y: clampY(cy - ph / 2), ok: hole.left - gap - pw >= edge }),
+  };
+  let side = ['bottom', 'top', 'right', 'left'].find(s => C4[s]().ok), P;
+  if (side) P = C4[side]();
+  else {   // 어느 쪽에도 다 들어가지 않으면(큰 대상) 여유가 더 큰 위·아래 가장자리에 겹쳐 둡니다
+    side = 'over';
+    P = { x: clampX(cx - pw / 2), y: (hole.top > vh - hole.bottom) ? edge : vh - ph - edge };
+  }
+  pop.dataset.side = side;
+  pop.style.left = P.x + 'px'; pop.style.top = P.y + 'px';
+  pop.style.setProperty('--ax', Math.max(18, Math.min(pw - 18, cx - P.x)) + 'px');
+  pop.style.setProperty('--ay', Math.max(18, Math.min(ph - 18, cy - P.y)) + 'px');
+}
+function tourFrame() {
+  if (!tour) return;
+  /* 화면 자체가 바뀌었으면(외부 도구 등) 기록하지 않고 조용히 닫습니다 */
+  if (stage().firstElementChild !== tour.scr) { tourEnd(false); return; }
+  tourPlace();
+  if (tour) tour.raf = requestAnimationFrame(tourFrame);
+}
+function tourEnd(mark) {
+  const T = tour; if (!T) return;
+  cancelAnimationFrame(T.raf);
+  T.root.remove(); tour = null;
+  if (mark) tourMark(T.id);
+  setTimeout(tourNext, 200);
+}
+/* 투어 중에는 키 입력을 모두 투어가 먼저 받고 뒤쪽 게임으로 넘기지 않습니다 */
+window.addEventListener('keydown', e => {
+  if (!tour) return;
+  e.stopImmediatePropagation();
+  if (e.key === 'Tab') { e.preventDefault(); const b = $$('.tour-pop button', tour.root), i = b.indexOf(document.activeElement); b[(i + (e.shiftKey ? -1 : 1) + b.length) % b.length].focus(); return; }
+  e.preventDefault();
+  if (e.repeat) return;
+  if (e.key === 'Escape') tourEnd(true);
+  else if (e.key === 'Enter' || e.key === 'ArrowRight' || e.key === ' ') {
+    if (e.key !== 'ArrowRight' && document.activeElement && document.activeElement.classList.contains('tour-skip')) tourEnd(true);
+    else tourGo(tour.i + 1, 1);
+  } else if (e.key === 'ArrowLeft') tourGo(tour.i - 1, -1);
+}, true);
 
 /* =====================================================================
    시작

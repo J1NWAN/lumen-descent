@@ -6,6 +6,7 @@
   2) localStorage 를 막은 환경(접근만 해도 예외)에서도 첫 화면 → 전투까지 깨지지 않는지
   3) Google Fonts 말고 바깥 주소로 나가는 요청이 없는지
   4) 첫 화면·지도·전투 화면 스크린샷(build/shots/web-*.png)
+  5) 첫 실행 안내(투어)가 지도·전투에서 뜨고, 건너뛰기(Esc)·다음(Enter)으로 닫히는지
 """
 import asyncio, sys, threading, functools, http.server, socketserver
 from pathlib import Path
@@ -78,12 +79,28 @@ async def run_case(b, url, w, h, tag, block_ls, owner=False):
     await pg.click('#t-new'); await pg.wait_for_timeout(300)
     await pg.click('#s-go'); await pg.wait_for_timeout(300)
     await pg.click('#st-go'); await pg.wait_for_timeout(600)
+    tour = {}
+    # 지도 안내: 뜨는지 보고 Esc(건너뛰기)로 닫습니다
+    try: await pg.wait_for_selector('#tour[data-id="map"]', timeout=3000); tour['map'] = 'shown'
+    except Exception: tour['map'] = 'missing'
+    if tour['map'] == 'shown':
+        await pg.wait_for_timeout(400); await pg.screenshot(path=pre + '-2tour.png')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        tour['map'] += ', closed' if not await pg.query_selector('#tour') else ', STUCK'
     await pg.screenshot(path=pre + '-2map.png')
     # 첫 줄의 방 중 전투 방으로
     node = await pg.query_selector('.node.avail.t-mon') or await pg.query_selector('.node.avail')
     await node.dispatch_event('click'); await pg.wait_for_timeout(1800)  # 노드는 계속 맥동해서 일반 클릭은 '안정되지 않음'으로 기다립니다
     in_combat = await pg.query_selector('.combat-screen') is not None
     if in_combat:
+        # 전투·영웅 안내: Enter(다음)로 끝까지 넘깁니다
+        n = 0
+        for _ in range(20):
+            if not await pg.query_selector('#tour'):
+                try: await pg.wait_for_selector('#tour', timeout=1500 if n else 3000)
+                except Exception: break
+            await pg.keyboard.press('Enter'); n += 1; await pg.wait_for_timeout(250)
+        tour['combat'] = f'{n} steps, ' + ('closed' if not await pg.query_selector('#tour') else 'STUCK')
         # 카드 한 장을 쓰고 턴을 넘겨 저장·연출 경로를 지나가 봅니다
         c = await pg.query_selector('#hand .card.playable')
         if c:
@@ -95,6 +112,7 @@ async def run_case(b, url, w, h, tag, block_ls, owner=False):
         if et: await et.dispatch_event('click'); await pg.wait_for_timeout(4500)
         await pg.screenshot(path=pre + '-4turn2.png')
     info['combat'] = in_combat
+    info['tour'] = tour
     info['overflowX2'] = await pg.evaluate('document.documentElement.scrollWidth - innerWidth')
     await ctx.close()
     return info, errs, sorted(ext), bad, netfail
@@ -123,7 +141,8 @@ async def main():
             gamefail = [f for f in netfail if f[0] not in ALLOWED]
             if fontfail: print(f'  경고: 글꼴 요청 {len(fontfail)}건 실패(망 문제) —', sorted(set(x[1] for x in fontfail)))
             print('  게임 자원 요청 실패:', gamefail or '없음')
-            if errs or extra or bad or gamefail or info['claude'] != 'undefined' or info['lab'] != 'hidden' or not info['combat']:
+            if errs or extra or bad or gamefail or info['claude'] != 'undefined' or info['lab'] != 'hidden' or not info['combat'] \
+                    or any('STUCK' in v or 'missing' in v for v in info['tour'].values()):
                 ok = False
         own = await run_case(b, url, w, h, tag, False, owner=True)
         print('[비교: 소유자 흉내] 연구소 버튼:', own['lab'], '(visible 이어야 정상)')
