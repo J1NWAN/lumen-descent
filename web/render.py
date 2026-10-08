@@ -47,6 +47,15 @@ def load_config():
     return cfg
 
 
+def og_image_meta(base, alt):
+    """공유 미리보기 그림(1200×630). 도메인이 있으면 크롤러가 읽을 수 있도록 전체 주소로 씁니다."""
+    src = (base.rstrip('/') if base else '') + '/og.jpg'
+    return [f'<meta property="og:image" content="{e(src)}">', '<meta property="og:image:type" content="image/jpeg">',
+            '<meta property="og:image:width" content="1200">', '<meta property="og:image:height" content="630">',
+            f'<meta property="og:image:alt" content="{e(alt)}">', '<meta name="twitter:card" content="summary_large_image">',
+            f'<meta name="twitter:image" content="{e(src)}">']
+
+
 class Site:
     def __init__(self, cfg, data):
         self.cfg, self.d = cfg, data
@@ -82,7 +91,7 @@ class Site:
             sub = '<nav class="dex" aria-label="도감">' + ''.join(f'<a href="{h}"{" aria-current=page" if h == path else ""}>{t}</a>' for h, t in self.DEX) + '</nav>'
         meta = [f'<title>{e(full)}</title>', f'<meta name="description" content="{e(desc)}">',
                 f'<meta property="og:title" content="{e(full)}">', f'<meta property="og:description" content="{e(desc)}">',
-                f'<meta property="og:type" content="{ogtype}">', f'<meta property="og:site_name" content="{e(self.name)}">', '<meta property="og:locale" content="ko_KR">']
+                f'<meta property="og:type" content="{ogtype}">', f'<meta property="og:site_name" content="{e(self.name)}">', '<meta property="og:locale" content="ko_KR">'] + og_image_meta(self.base, f'{self.name} — 브라우저 덱 빌딩 로그라이크')
         if url:
             meta += [f'<link rel="canonical" href="{e(url)}">', f'<meta property="og:url" content="{e(url)}">']
         if path == '/404.html':
@@ -584,6 +593,7 @@ def build(dist, release=False):
         f.write_text(txt)
     (dist / 'assets').mkdir(exist_ok=True)
     shutil.copy(WEB / 'site.css', dist / 'assets' / 'site.css')
+    shutil.copy(WEB / 'og.jpg', dist / 'og.jpg')
     (dist / 'favicon.svg').write_text(FAVICON_SVG)
     if (dist / 'img').exists():
         shutil.rmtree(dist / 'img')
@@ -619,6 +629,7 @@ def index_extras(cfg_name=None):
     name = cfg['site_name'] or '루멘 디센트'
     base = f"https://{cfg['domain']}/" if cfg['domain'] else ''
     head = (f'<link rel="canonical" href="{e(base)}">\n<meta property="og:url" content="{e(base)}">\n' if base else '')
+    head += '\n'.join(og_image_meta(base, f'{name} — 브라우저 덱 빌딩 로그라이크')) + '\n'
     flag = '<script>window.__lumenWeb = true;</script>\n'
     noscript = f'''<noscript><div class="nojs" style="max-width:640px;margin:40px auto;padding:0 16px;color:#ece4d4;font-family:sans-serif;line-height:1.7">
 <h1>{e(name)}</h1>
